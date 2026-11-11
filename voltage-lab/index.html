@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Voltage Lab</title>
+<meta name="description" content="Voltage Lab: From Zero to Confident Measurements — an interactive 3D voltmeter training simulator.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">V</span>
+      <div>
+        <h1 id="t-title">Voltage Lab</h1>
+        <p id="t-sub">From Zero to Confident Measurements</p>
+      </div>
+      <span class="badge" id="t-badge">Simulation only</span>
+    </div>
+    <div class="top-controls">
+      <label><span id="l-mode">Mode</span>
+        <select id="sel-mode">
+          <option value="guided">Guided</option>
+          <option value="practice">Practice</option>
+          <option value="assess">Assessment</option>
+        </select>
+      </label>
+      <label><span id="l-lang">Language</span>
+        <select id="sel-lang">
+          <option value="en">English</option>
+          <option value="es">Español</option>
+        </select>
+      </label>
+      <button type="button" class="toggle" id="btn-narr" aria-pressed="false"></button>
+      <button type="button" class="toggle" id="btn-cap" aria-pressed="true"></button>
+      <button type="button" id="btn-help"></button>
+    </div>
+  </header>
+  <main>
+    <section id="stage" aria-label="3D workbench">
+      <div class="stage-bar" id="stage-bar"></div>
+      <div class="chip" id="chip" hidden></div>
+      <div class="tip" id="tip" hidden></div>
+      <div class="nogl" id="nogl" hidden></div>
+      <p class="stage-help" id="stage-help"></p>
+      <div class="caption" id="caption" role="status" aria-live="polite" hidden></div>
+      <div class="inset" id="s-diagram"></div>
+    </section>
+    <aside id="panel" aria-label="Lesson panel">
+      <div id="r-nav"></div>
+      <div id="r-coach" aria-live="assertive"></div>
+      <div id="r-step"></div>
+      <div id="r-meter"></div>
+      <div id="r-diagram"></div>
+      <div id="r-check"></div>
+      <div id="r-controls"></div>
+      <div id="r-gloss"></div>
+    </aside>
+  </main>
+</div>
+<dialog id="help">
+  <h2 id="help-title"></h2>
+  <div id="help-body"></div>
+  <form method="dialog"><button id="help-ok" class="primary"></button></form>
+</dialog>
+<script src="dist/voltage-lab.js"></script>
+</body>
+</html>
