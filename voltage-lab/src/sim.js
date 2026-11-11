@@ -16,30 +16,34 @@ export const RANGE_INFO = {
 export const CHECK_ITEMS = ['inspect', 'jacks', 'func', 'range', 'points', 'guards', 'bridge'];
 
 // Element types: v = ideal voltage source (a is +), w = wire, s = switch, r = resistor.
+// `fault` names a fault that opens the element. `alt` gives a source a different
+// voltage while a fault is active. `wireUnless` marks a series resistance that
+// exists only while a fault is active (otherwise the element is a plain wire).
 export const CIRCUITS = {
-  aa: { kind: 'dc', ref: 'n', el: [{ t: 'v', a: 'p', b: 'n', v: 1.58 }] },
-  b9: { kind: 'dc', ref: 'n', el: [{ t: 'v', a: 'p', b: 'n', v: 9.36 }] },
+  aa: { kind: 'dc', ref: 'n', el: [{ t: 'v', a: 'p', b: 'n', v: 1.58, alt: { fault: 'aa_low', v: 1.08 } }] },
+  b9: { kind: 'dc', ref: 'n', el: [{ t: 'v', a: 'p', b: 'n', v: 9.36, alt: { fault: 'b9_low', v: 6.85 } }] },
   lamp9: {
     kind: 'dc', ref: 'bn', el: [
-      { t: 'v', a: 'bp', b: 'bn', v: 9 },
+      { t: 'v', a: 'bi', b: 'bn', v: 9, alt: { fault: 'l9_bat', v: 7.2 } },
+      { t: 'r', a: 'bi', b: 'bp', r: 400, wireUnless: 'l9_bat' },
       { t: 'w', a: 'bp', b: 's1' },
-      { t: 's', a: 's1', b: 's2', sw: 'lamp9' },
-      { t: 'w', a: 's2', b: 'lp' },
-      { t: 'r', a: 'lp', b: 'ln', r: 90, lamp: 'lamp9', nominal: 9 },
-      { t: 'w', a: 'ln', b: 'bn' },
+      { t: 's', a: 's1', b: 's2', sw: 'lamp9', fault: 'l9_sw' },
+      { t: 'w', a: 's2', b: 'lp', fault: 'l9_w2' },
+      { t: 'r', a: 'lp', b: 'ln', r: 90, lamp: 'lamp9', nominal: 9, fault: 'l9_lamp' },
+      { t: 'w', a: 'ln', b: 'bn', fault: 'l9_w3' },
     ],
   },
   panel24: {
     kind: 'dc', ref: 'vn', el: [
-      { t: 'v', a: 'vp', b: 'vn', v: 24 },
+      { t: 'v', a: 'vp', b: 'vn', v: 24, alt: { fault: 'p_sup', v: 0 } },
       { t: 'w', a: 'vp', b: 's1' },
-      { t: 's', a: 's1', b: 's2', sw: 'panel24' },
+      { t: 's', a: 's1', b: 's2', sw: 'panel24', fault: 'p_sw' },
       { t: 'w', a: 's2', b: 'lp', fault: 'w2open' },
-      { t: 'r', a: 'lp', b: 'ln', r: 1200, lamp: 'panel24', nominal: 24 },
-      { t: 'w', a: 'ln', b: 'vn' },
+      { t: 'r', a: 'lp', b: 'ln', r: 1200, lamp: 'panel24', nominal: 24, fault: 'p_lamp' },
+      { t: 'w', a: 'ln', b: 'vn', fault: 'p_w3' },
     ],
   },
-  ac12: { kind: 'ac', ref: 'b', freq: 60, el: [{ t: 'v', a: 'a', b: 'b', v: 12 }] },
+  ac12: { kind: 'ac', ref: 'b', freq: 60, el: [{ t: 'v', a: 'a', b: 'b', v: 12, alt: { fault: 'ac_off', v: 0 } }] },
 };
 
 // Test points. `bridge` marks a gap between two adjacent terminals: a probe tip
@@ -104,8 +108,10 @@ export function solveCircuit(cid, switches = {}, faults = {}, meter = null) {
   const union = (a, b) => { parent[find(a)] = find(b); };
   for (const e of c.el) {
     find(e.a); find(e.b);
-    if (e.t === 'w' && !(e.fault && faults[e.fault])) union(e.a, e.b);
-    if (e.t === 's' && switches[e.sw]) union(e.a, e.b);
+    const open = e.fault && faults[e.fault];
+    if (e.t === 'w' && !open) union(e.a, e.b);
+    if (e.t === 's' && switches[e.sw] && !open) union(e.a, e.b);
+    if (e.t === 'r' && e.wireUnless && !faults[e.wireUnless]) union(e.a, e.b);
   }
   const ref = find(c.ref);
   const roots = [...new Set(Object.keys(parent).map(find))].filter((r) => r !== ref);
@@ -124,14 +130,14 @@ export function solveCircuit(cid, switches = {}, faults = {}, meter = null) {
     if (ia !== undefined && ib !== undefined) { A[ia][ib] -= g; A[ib][ia] -= g; }
   };
   for (let i = 0; i < n; i++) A[i][i] += GMIN;
-  for (const e of c.el) if (e.t === 'r') stamp(e.a, e.b, 1 / e.r);
+  for (const e of c.el) if (e.t === 'r' && !(e.fault && faults[e.fault])) stamp(e.a, e.b, 1 / e.r);
   if (meter) stamp(meter[0], meter[1], 1 / R_METER);
   sources.forEach((e, k) => {
     const ia = idx.get(find(e.a));
     const ib = idx.get(find(e.b));
     if (ia !== undefined) { A[n + k][ia] = 1; A[ia][n + k] = 1; }
     if (ib !== undefined) { A[n + k][ib] = -1; A[ib][n + k] = -1; }
-    z[n + k] = e.v;
+    z[n + k] = e.alt && faults[e.alt.fault] ? e.alt.v : e.v;
   });
   const x = solveLinear(A, z);
   const v = (node) => {
@@ -152,7 +158,7 @@ function defaultState() {
     probes: { red: null, black: null }, // which terminal each probe tip touches
     near: { red: null, black: null }, // probe hovering beside a terminal (no contact)
     switches: { lamp9: false, panel24: false },
-    faults: { w2open: false },
+    faults: {},
     faultRevealed: false,
     damaged: { red: false, black: false },
     inspected: { meter: false, red: false, black: false },
@@ -418,6 +424,7 @@ export class Sim {
   lampLevel(id) {
     const cid = id;
     const e = CIRCUITS[cid].el.find((x) => x.lamp === id);
+    if (e.fault && this.state.faults[e.fault]) return 0;
     const sol = this.solve(cid);
     return Math.abs(sol.v(e.a) - sol.v(e.b)) / e.nominal;
   }
@@ -490,7 +497,7 @@ export class Sim {
   connSig() {
     const s = this.state;
     return [s.dial, s.plugs.red, s.plugs.black, s.probes.red, s.probes.black,
-      s.switches.lamp9, s.switches.panel24, s.faults.w2open].join('|');
+      s.switches.lamp9, s.switches.panel24, JSON.stringify(s.faults)].join('|');
   }
 
   displayText(d = this.display) {

@@ -273,3 +273,5 @@ dialog form { display: flex; justify-content: flex-end; margin-top: 10px; }
   dl.five > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+table.log td:nth-child(2) { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }

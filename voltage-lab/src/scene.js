@@ -430,7 +430,7 @@ export function createScene(container, sim, ctl) {
   const w2fault = makeSprite('', { h: 0.34, bg: '#ffffff', fg: '#8f1d16', border: '#8f1d16' });
   w2fault.position.copy(pn.localToWorld(V3(1.45, 0.3, -0.45))); w2fault.visible = false; scene.add(w2fault);
   dynLabels.push(() => {
-    const open = sim.state.faults.w2open && sim.state.faultRevealed;
+    const open = !!(sim.state.faults.w2open && sim.state.faultRevealed);
     w2mid.visible = !open;
     w2fault.visible = open;
     w2fault.userData.set(`✖ W2: ${tr(UI.faultOpen)}`);

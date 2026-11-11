@@ -58,6 +58,15 @@ narration on/off, captions on/off, Help.
 - **Modes:** Guided (highlights and step-by-step coaching), Practice (hints and
   explanations on request), Assessment (ten tasks, no hints until each submission,
   safety blocks still active, report at the end).
+- **Help me diagnose** (top-bar button): choose what you want to check — battery
+  voltage, a lamp that will not turn on, the simulated 24 V control circuit, or the
+  12 V AC source. The guide says whether a voltage measurement can help, which jacks,
+  AC/DC setting and range to use, and where both probes go; asks for a prediction
+  before each measurement; then compares measured and expected values, lists which
+  explanations the reading rules out and which still fit, and proposes the next
+  measurement that separates them. It names a cause only when the readings leave one
+  explanation, never from a single ambiguous reading, and states what voltage
+  testing cannot establish. Each scenario cycles through several modelled cases.
 - **Pre-measurement check** that gates every probe contact: inspect, jacks, function,
   range, intended test points, fingers behind guards, no bridging.
 - **Error coaching** with what happened / why it matters / how to fix it / Retry for:
@@ -71,6 +80,9 @@ narration on/off, captions on/off, Help.
 - Each circuit is a list of sources, wires, switches and resistors. Node potentials
   come from modified nodal analysis; closed switches and intact wires merge nodes; an
   open-wire fault removes a wire. The meter's 10 MΩ input is part of the solve.
+- The diagnose guide (`src/diagnose.js`) treats each candidate cause as a set of
+  circuit faults, solves the circuit for each one, and keeps only the causes that
+  agree with every reading actually taken. Nothing in it is a scripted answer.
 - DC reading = potential at the lead in V/Ω − potential at the lead in COM. The AC
   source reads its RMS value in V~.
 - The display depends on dial position, jacks, range (AUTO, 2 V, 20 V, 200 V), probe
@@ -96,6 +108,9 @@ narration on/off, captions on/off, Help.
 - **Probe contact is snap-based.** Bridging is modelled only at two defined gaps (the
   9 V battery snaps and the 24 V panel's supply terminals); a "near miss" is a probe
   released close to, but not on, a terminal. There is no free-form contact physics.
+- **Help me diagnose** covers only the simulator's own scenarios and a fixed list of
+  modelled causes (one fault at a time). It cannot guide measurements on real
+  equipment and says so. Its cases come round in a fixed order rather than at random.
 - **Lead inspection** is a simple model: one lead in Lesson 5 has a visible nick that
   must be found and replaced.
 - **Lesson length** is a design target shown as an estimate, not an enforced limit.

@@ -237,6 +237,7 @@ export const UI = {
 <li><b>Probes:</b> drag a probe by its insulated handle onto a test point; it snaps when it is close enough. Or click the handle (it is now “in hand”), then click the test point. Click the handle again to put the probe down.</li>
 <li><b>Test points:</b> with no probe in hand, clicking a test point marks it as one of your two intended points. You must do this before a probe may touch it.</li>
 <li><b>No mouse?</b> Every action is also available under “Equipment controls” and on the circuit diagram, with keyboard focus.</li>
+<li><b>Help me diagnose:</b> pick what you want to check and the guide tells you whether voltage can help, how to set the meter, where both probes go, and what each reading rules out.</li>
 <li><b>Lessons:</b> a step completes only when your actual setup is right. “Show me” demonstrates, “Let me try” hands the equipment back, “Explain again” rephrases, “Reset” restores the start of the step.</li>
 </ul>
 <p><b>Known limits:</b> narration uses your browser’s built-in voices and may be missing in some browsers or languages (captions always work). Resistance (Ω) and current (A) are identified but deliberately not simulated. The meter is a generic teaching model: real meters have different layouts, ranges and overrange displays — read your own meter’s manual.</p>`,
@@ -248,6 +249,7 @@ export const UI = {
 <li><b>Puntas:</b> arrastra una punta por su mango aislado hasta un punto de prueba; se ajusta al acercarse. O haz clic en el mango (queda «en la mano») y luego en el punto. Haz clic otra vez en el mango para soltarla.</li>
 <li><b>Puntos de prueba:</b> sin punta en la mano, hacer clic en un punto lo marca como uno de tus dos puntos previstos. Debes hacerlo antes de que una punta pueda tocarlo.</li>
 <li><b>¿Sin ratón?</b> Todas las acciones están también en «Controles del equipo» y en el diagrama, con foco de teclado.</li>
+<li><b>Ayúdame a diagnosticar:</b> elige qué quieres comprobar y la guía te dice si el voltaje puede ayudar, cómo ajustar el medidor, dónde va cada punta y qué descarta cada lectura.</li>
 <li><b>Lecciones:</b> un paso se completa solo cuando tu configuración real es correcta. «Muéstrame» demuestra, «Déjame intentar» te devuelve el equipo, «Explícalo otra vez» lo reformula, «Reiniciar» restaura el inicio del paso.</li>
 </ul>
 <p><b>Límites conocidos:</b> la narración usa las voces del navegador y puede faltar en algunos navegadores o idiomas (los subtítulos siempre funcionan). Resistencia (Ω) y corriente (A) se identifican pero no se simulan, a propósito. El medidor es un modelo didáctico genérico: los medidores reales tienen otras disposiciones, rangos e indicaciones de sobrerrango; lee el manual de tu medidor.</p>`),
@@ -446,7 +448,7 @@ export const COACH = {
     title: T('Predict before you touch', 'Predice antes de tocar'),
     what: T('This step asks for your prediction before the probes make contact.', 'Este paso pide tu predicción antes de que las puntas hagan contacto.'),
     why: T('Predicting first is how you notice when a reading is surprising — the heart of troubleshooting.', 'Predecir primero es la forma de notar cuándo una lectura sorprende: la base del diagnóstico.'),
-    fix: T('Choose an answer under “Predict first” in the lesson panel.', 'Elige una respuesta en «Primero predice» en el panel de la lección.'),
+    fix: T('Answer the prediction question in the panel, then touch the test point.', 'Responde la pregunta de predicción en el panel y luego toca el punto de prueba.'),
   },
   jack_taken: {
     level: 'block',

@@ -5,6 +5,7 @@ import { LESSONS } from './lessons.js';
 import { TASKS, ERROR_LESSON } from './assessment.js';
 import { renderDiagram, diagramTerms, drawWave } from './diagrams.js';
 import { createScene } from './scene.js';
+import { SCENARIOS, GOALS, DXUI, newSession, recommend, consistent, outcomes, healthyValue, predictOptions, fmtV, hyp as dxHyp, meas as dxMeas, tol as dxTol } from './diagnose.js';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, window.__voltageLabFast ? Math.min(ms, 25) : ms));
@@ -27,12 +28,13 @@ const app = {
   coach: null, info: null, inspMsg: null, demo: false, caption: null, flash: null,
   errors: {},
   as: { started: false, idx: 0, results: {}, submitted: false, feedback: null, notes: new Set(), report: false },
+  dx: { stage: 'pick', goal: null, s: null, counts: {} },
 };
 setLang(store.lang || ((navigator.language || 'en').toLowerCase().startsWith('es') ? 'es' : 'en'));
 
 const newCtx = () => ({ events: [], clicked: new Set(), form: {} });
 const lesson = () => LESSONS[app.lessonIdx];
-const curStep = () => (app.mode === 'assess' ? null : lesson().steps[app.stepIdx]);
+const curStep = () => (app.mode === 'assess' || app.mode === 'diagnose' ? null : lesson().steps[app.stepIdx]);
 const curTask = () => (app.mode === 'assess' && app.as.started && !app.as.report ? TASKS[app.as.idx] : null);
 const termLabel = (id) => (id && TERMINALS[id] && TERMINALS[id].label) || '—';
 const colorName = (lead) => tr(lead === 'red' ? UI.red : UI.black);
@@ -83,7 +85,7 @@ const stateResolve = {
   same_node: () => !sim.cond.same_node,
   remove_order: () => !sim.anyContact() && !(app.ctx && app.ctx.badOrder),
   damaged_lead: () => !sim.state.damaged.red && !sim.state.damaged.black,
-  predict_first: () => app.ctx && app.ctx.predicted !== undefined,
+  predict_first: () => (app.mode === 'diagnose' ? !app.dx.s || app.dx.s.predicted !== undefined : app.ctx && app.ctx.predicted !== undefined),
   range_na: () => sim.isVMode(),
   meter_off_btn: () => sim.state.dial !== 'OFF',
 };
@@ -527,6 +529,169 @@ function recommendation() {
   return { topics, first: topics[0] || null };
 }
 
+
+// ---------------------------------------------------------------------------
+// "Help me diagnose" guide
+// ---------------------------------------------------------------------------
+const dxScn = () => (app.dx.s ? SCENARIOS[app.dx.s.scn] : null);
+const dxFn = (scn) => (scn.mode === 'VAC' ? 'V~' : 'V⎓');
+function dxStart(id) {
+  const scn = SCENARIOS[id];
+  const n = app.dx.counts[id] || 0;
+  app.dx.counts[id] = n + 1;
+  app.dx.s = { ...newSession(scn, n), phase: 'measure', caseNo: n + 1 };
+  app.dx.stage = 'run'; app.dx.goal = null;
+  app.ctx = newCtx(); app.coach = null; app.info = null; app.inspMsg = null; app.ui.selected = null;
+  sim.reset({ faults: app.dx.s.faults, switches: scn.sw ? { [scn.sw]: true } : {} });
+  app.ui.rest = scn.rest;
+  if (scene) scene.focus('meter');
+  speak(`${spoken(scn.title)}. ${spoken(scn.useful)}`);
+  const p = $('panel'); if (p) p.scrollTop = 0;
+}
+function dxReady() {
+  const scn = dxScn(); const s = sim.state;
+  return [
+    { label: tr(DXUI.subInspect), ok: sim.checkItem('inspect') },
+    { label: tr(DXUI.subJacks), ok: sim.jacksOK() && s.checklist.jacks },
+    { label: tr(DXUI.subFunc, { f: dxFn(scn) }), ok: s.dial === scn.mode && s.checklist.func },
+    { label: tr(DXUI.subRange, { r: scn.range }), ok: (s.range === 'AUTO' || s.range >= scn.range) && s.checklist.range },
+    { label: tr(DXUI.subHandling), ok: s.checklist.guards && s.checklist.bridge },
+  ];
+}
+function dxMeasureSubs() {
+  const scn = dxScn(); const d = app.dx.s; const m = d.cur.m; const s = sim.state; const r = sim.reading();
+  const a = termLabel(m.red); const b = termLabel(m.black);
+  const onPair = (s.probes.red === m.red && s.probes.black === m.black) || (s.probes.red === m.black && s.probes.black === m.red);
+  const subs = [{ label: tr(DXUI.subPredicted), ok: d.predicted !== undefined }];
+  if (scn.sw) subs.push({ label: tr(DXUI.subSwitch, { s: tr(m.sw ? UI.closed : UI.open) }), ok: s.switches[scn.sw] === m.sw });
+  subs.push({ label: tr(DXUI.subPoints, { a, b }), ok: s.intended.length === 2 && s.intended.includes(m.red) && s.intended.includes(m.black) });
+  subs.push({ label: tr(DXUI.subProbes, { a, b }), ok: onPair });
+  subs.push({ label: tr(DXUI.subSteady), ok: onPair && r.valid && sim.settled && !s.hold && !r.mismatch && !sim.live.ol });
+  return subs;
+}
+function dxTick() {
+  const d = app.dx.s;
+  if (app.dx.stage !== 'run' || !d || d.phase !== 'measure' || !d.cur) return;
+  if (!dxReady().every((x) => x.ok)) { d.wasReady = false; return; }
+  const scn = dxScn(); const m = d.cur.m;
+  if (!d.wasReady) { d.wasReady = true; if (scene) scene.focus(scn.focus); dirty = true; }
+  if (!dxMeasureSubs().every((x) => x.ok)) return;
+  const r = sim.reading();
+  const value = r.kind === 'dc' && sim.state.probes.red === m.black ? -r.value : r.value;
+  const before = consistent(scn, d.readings).map((h) => h.id);
+  d.readings.push({ id: m.id, value, text: sim.displayText(), healthy: healthyValue(scn, m), predicted: d.predicted, correct: predictOptions(scn, m).correct, before });
+  d.readings[d.readings.length - 1].after = consistent(scn, d.readings).map((h) => h.id);
+  d.next = recommend(scn, d.readings);
+  d.phase = 'review';
+  dirty = true;
+}
+function dxContinue() {
+  const d = app.dx.s;
+  if (d.next) { d.cur = d.next; d.next = null; d.predicted = undefined; d.phase = 'measure'; d.wasReady = false; } else {
+    d.phase = 'done';
+    sim.setup({ faultRevealed: true });
+    const live = consistent(dxScn(), d.readings);
+    if (live.length === 1) speak(`${spoken(live[0].finding)} ${spoken(live[0].limit)}`);
+  }
+  const p = $('panel'); if (p) p.scrollTop = 0;
+}
+const dxPair = (m) => `${termLabel(m.red)} → ${termLabel(m.black)}`;
+function dxEvidence(scn, d) {
+  if (!d.readings.length) return '';
+  return `<div class="box"><h3>${tr(DXUI.evidence)}</h3><table class="log"><tr><td></td><td>${tr(DXUI.measured)}</td><td>${tr(DXUI.expected)}</td></tr>${d.readings.map((r) => {
+    const m = dxMeas(scn, r.id);
+    return `<tr><td>${esc(dxPair(m))}${scn.sw ? ` · ${tr(m.sw ? UI.closed : UI.open)}` : ''}</td><td>${esc(r.text)}</td><td>${esc(fmtV(r.healthy))}</td></tr>`;
+  }).join('')}</table></div>`;
+}
+function dxHTML() {
+  const x = app.dx;
+  if (x.stage === 'pick') {
+    const goal = GOALS.find((g) => g.id === x.goal);
+    return `<div class="card"><h2>${tr(DXUI.pickQ)}</h2><p>${tr(DXUI.pickIntro)}</p>
+      <div class="opts">${GOALS.map((g) => btn('dx-goal', h(g.title), `data-id="${g.id}" aria-pressed="${x.goal === g.id}"`, x.goal === g.id ? 'picked' : '')).join('')}</div>
+      ${goal && goal.sub ? `<div class="box"><p class="q">${tr(DXUI.whichBattery)}</p><div class="opts">${goal.sub.map((id) => btn('dx-scn', h(SCENARIOS[id].title), `data-id="${id}"`)).join('')}</div></div>` : ''}
+      ${x.goal === 'other' ? `<div class="again"><b>${tr(DXUI.otherTitle)}.</b> ${tr(DXUI.otherBody)}</div>` : ''}</div>`;
+  }
+  const scn = dxScn(); const d = x.s;
+  const ready = dxReady();
+  const allReady = ready.every((r) => r.ok);
+  const subList = (subs) => `<ul class="subs">${subs.map((s) => `<li>${mark(s.ok)}<span>${h(s.label)}</span></li>`).join('')}</ul>`;
+  const names = (ids) => ids.map((id) => `<li>${h(dxHyp(scn, id).label)}</li>`).join('');
+  let body = `<p class="small" style="margin:0 0 6px">${tr(DXUI.caseN, { n: d.caseNo })}</p>`;
+  if (d.phase === 'measure') {
+    const m = d.cur.m;
+    if (!d.readings.length) body += `<h3>${tr(DXUI.usefulQ)}</h3><p style="margin-top:0">${h(scn.useful)}</p>`;
+    if (!allReady || !d.readings.length) {
+      body += `<h3>${tr(DXUI.setupTitle)}</h3><ul class="points"><li>${h(DXUI.adviceJacks)}</li><li>${h(scn.mode === 'VAC' ? DXUI.adviceAC : DXUI.adviceDC)}</li><li>${h(DXUI.adviceRange, { n: scn.nominal, r: scn.range })}</li></ul>${subList(ready)}${allReady ? '' : `<p class="small">${tr(DXUI.setupHint)}</p>`}`;
+    }
+    const a = termLabel(m.red); const b = termLabel(m.black);
+    const po = predictOptions(scn, m);
+    body += `<h3 style="margin-top:12px">${tr(DXUI.measN, { n: d.readings.length + 1 })}</h3>
+      <dl class="five"><div><dt>${tr(UI.goal)}</dt><dd>${h(DXUI.measure, { what: tr(m.what) })}</dd></div>
+      <div><dt>${tr(UI.why)}</dt><dd>${h(DXUI.tells, { tells: tr(m.tells) })}</dd></div>
+      <div class="act"><dt>${tr(UI.action)}</dt><dd>${scn.sw ? `${tr(m.sw ? DXUI.swClosed : DXUI.swOpen)} ` : ''}${h(DXUI.where, { a, b })}</dd></div></dl>
+      <div class="box"><p class="q">${tr(DXUI.predictQ)}</p><div class="opts">${po.vals.map((v, i) => btn('dx-predict', tr(DXUI.about, { v: fmtV(v) }), `data-i="${i}" aria-pressed="${d.predicted === i}"`, d.predicted === i ? 'picked' : '')).join('')}</div></div>
+      ${subList(dxMeasureSubs())}`;
+    const r = sim.reading(); const p = sim.state.probes;
+    if (r.valid && sim.settled && !(p.red && p.black && [m.red, m.black].includes(p.red) && [m.red, m.black].includes(p.black) && p.red !== p.black)) {
+      body += `<p class="state info">${tr(UI.wrongPair, { a: termLabel(p.red), b: termLabel(p.black), want: `${a} + ${b}` })}</p>`;
+    }
+    body += dxEvidence(scn, d);
+  } else if (d.phase === 'review') {
+    const r = d.readings[d.readings.length - 1];
+    const m = dxMeas(scn, r.id);
+    const match = Math.abs(r.value - r.healthy) <= dxTol(scn);
+    const po = predictOptions(scn, m);
+    const ruled = r.before.filter((id) => !r.after.includes(id));
+    body += `<h3>${tr(DXUI.resultTitle)}: ${esc(dxPair(m))}</h3>
+      <table class="log"><tr><td>${tr(DXUI.measured)}</td><td>${esc(r.text)}</td></tr><tr><td>${tr(DXUI.expected)}</td><td>${tr(DXUI.about, { v: fmtV(r.healthy) })}</td></tr>
+      <tr><td>${tr(DXUI.predicted)}</td><td>${tr(DXUI.about, { v: fmtV(po.vals[r.predicted]) })} ${r.predicted === r.correct ? '✔' : '✘'}</td></tr></table>
+      <p class="state ${match ? 'ok' : 'info'}">${tr(match ? DXUI.match : DXUI.differ)}</p>
+      <p class="fb">${tr(r.predicted === r.correct ? UI.predRight : UI.predWrong)}</p>
+      <h3 style="margin-top:12px">${tr(DXUI.ruledOut)}</h3>${ruled.length ? `<ul class="points">${names(ruled)}</ul>` : `<p style="margin:0">${tr(DXUI.ruledNone)}</p>`}
+      <h3 style="margin-top:12px">${tr(DXUI.still)}</h3><ul class="points">${names(r.after)}</ul>`;
+    if (r.after.length > 1) body += `<p class="state info">${tr(DXUI.ambiguous)}</p>`;
+    else if (d.next && d.next.reason === 'confirm') body += `<p class="state info">${tr(DXUI.oneNeedsConfirm)}</p>`;
+    if (d.next) {
+      const live = r.after.map((id) => dxHyp(scn, id));
+      body += `<h3 style="margin-top:12px">${tr(DXUI.nextTitle)}</h3>`;
+      if (d.next.reason === 'split') {
+        body += `<p style="margin:0">${h(DXUI.nextSplit, { what: tr(d.next.m.what) })}</p><ul class="points">${outcomes(scn, live, d.next.m).map((g) => `<li>${h(DXUI.wouldPoint, { v: fmtV(g.value), h: g.hyps.map((y) => tr(y.label)).join(' / ') })}</li>`).join('')}</ul>`;
+      } else body += `<p style="margin:0">${h(DXUI.nextConfirm, { what: tr(d.next.m.what) })}</p>`;
+    }
+    body += `<div class="btns">${btn('dx-continue', `${tr(DXUI.cont)} →`, '', 'primary')}</div>${dxEvidence(scn, d)}`;
+  } else {
+    const live = consistent(scn, d.readings);
+    body += `<h3>${tr(DXUI.conclTitle)}</h3>`;
+    if (live.length === 1) {
+      body += `<p style="margin:0">${tr(d.readings.length > 1 ? DXUI.conclOne : DXUI.conclSingle, { n: d.readings.length })}</p><p class="state ok">${h(live[0].label)}</p><p>${h(live[0].finding)}</p>
+        <h3>${tr(DXUI.limitTitle)}</h3><p style="margin-top:0">${h(live[0].limit)}</p>`;
+    } else if (live.length > 1) {
+      body += `<p style="margin:0">${tr(DXUI.conclMany)}</p><ul class="points">${names(live.map((y) => y.id))}</ul>`;
+    } else body += `<p class="state bad">${tr(DXUI.conclNone)}</p>`;
+    body += `<div class="again"><b>${tr(DXUI.revealTitle)}:</b> ${h(DXUI.revealFault, { h: tr(dxHyp(scn, d.actual).label) })}</div>${dxEvidence(scn, d)}
+      <h3 style="margin-top:12px">${tr(DXUI.wrapTitle)}</h3><ul class="subs"><li>${mark(!sim.anyContact())}<span>${tr(DXUI.wrapProbes)}</span></li><li>${mark(sim.state.dial === 'OFF')}<span>${tr(DXUI.wrapOff)}</span></li></ul>
+      <h3 style="margin-top:12px">${tr(UI.sequenceTitle)}</h3><ol class="seq">${SEQ().map((q) => `<li>${esc(q)}</li>`).join('')}</ol>
+      <p class="small">${tr(UI.repDisclaimer)}</p>
+      <div class="btns">${btn('dx-again', tr(DXUI.again), '', 'primary')}${btn('dx-pick', tr(DXUI.back))}</div>`;
+  }
+  return `<div class="card"><h2>${h(scn.title)}</h2>${body}</div>`;
+}
+function dxHighlights() {
+  const x = app.dx; const d = x.s;
+  if (x.stage !== 'run' || !d || d.phase !== 'measure') return [];
+  const scn = dxScn(); const s = sim.state;
+  if (!sim.checkItem('inspect')) return ['meter', 'lead:red', 'lead:black'];
+  if (s.plugs.black !== 'COM') return ['plug:black', 'jack:COM'];
+  if (s.plugs.red !== 'V') return ['plug:red', 'jack:V'];
+  if (s.dial !== scn.mode) return [`dialpos:${scn.mode}`];
+  if (!(s.range === 'AUTO' || s.range >= scn.range)) return ['btn:range'];
+  if (!dxReady().every((r) => r.ok)) return [];
+  const m = d.cur.m;
+  if (scn.sw && s.switches[scn.sw] !== m.sw) return [`switch:${scn.sw}`];
+  return [`term:${m.red}`, `term:${m.black}`];
+}
+
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
@@ -569,7 +734,8 @@ function paintChrome() {
   $('l-mode').textContent = tr(UI.mode);
   $('l-lang').textContent = tr(UI.language);
   const sm = $('sel-mode');
-  sm.options[0].textContent = tr(UI.guided); sm.options[1].textContent = tr(UI.practice); sm.options[2].textContent = tr(UI.assessment);
+  sm.options[0].textContent = tr(UI.guided); sm.options[1].textContent = tr(UI.practice); sm.options[2].textContent = tr(UI.assessment); sm.options[3].textContent = tr(DXUI.mode);
+  $('btn-diag').textContent = tr(DXUI.btn);
   sm.value = app.mode;
   $('sel-lang').value = getLang();
   const nb = $('btn-narr');
@@ -591,6 +757,9 @@ function paintChrome() {
 }
 
 function navHTML() {
+  if (app.mode === 'diagnose') {
+    return `<div class="card nav"><div class="nav-row"><h2 style="margin:0;flex:1">${tr(DXUI.btn)}</h2>${app.dx.stage === 'run' ? btn('dx-pick', tr(DXUI.back)) : ''}</div><small>${tr(UI.simBadge)}</small></div>`;
+  }
   if (app.mode === 'assess') {
     const a = app.as;
     const n = a.report ? TASKS.length : a.started ? a.idx + (a.submitted ? 1 : 0) : 0;
@@ -683,6 +852,7 @@ const SEQ = () => tr(UI.sequence).replace(/\.$/, '').split(' → ');
 
 function stepHTML() {
   if (app.mode === 'assess') return assessHTML();
+  if (app.mode === 'diagnose') return dxHTML();
   const L = lesson(); const s = curStep(); const c = app.ctx;
   if (app.finished) {
     const last = app.lessonIdx === LESSONS.length - 1;
@@ -820,6 +990,7 @@ function meterHTML() {
 }
 
 function diagramKind() {
+  if (app.mode === 'diagnose') { const scn = dxScn(); return app.dx.stage === 'run' && scn ? scn.diagram : 'none'; }
   if (app.mode === 'assess') { const t = curTask(); return t ? t.diagram : 'none'; }
   const s = curStep();
   return (s && s.diagram) || lesson().diagram;
@@ -883,6 +1054,7 @@ function glossHTML() {
 
 function highlights() {
   if (app.flash && performance.now() < app.flash.until) return app.flash.keys;
+  if (app.mode === 'diagnose') return dxHighlights();
   if (app.mode === 'assess' || app.finished) return [];
   const s = curStep(); const c = app.ctx;
   if (!s || c.passed || c.tryMode || app.demo) return [];
@@ -915,7 +1087,12 @@ function paint() {
   let text = '';
   if (app.captions) {
     if (app.caption && performance.now() < app.caption.until) text = app.caption.text;
-    else if (app.mode === 'assess') { const t = curTask(); text = t ? tr(t.title) : ''; } else if (!app.finished) {
+    else if (app.mode === 'diagnose') {
+      const d = app.dx.s;
+      if (app.dx.stage !== 'run' || !d) text = tr(DXUI.pickQ);
+      else if (d.phase === 'measure') text = dxReady().every((r) => r.ok) ? spokenPlain(DXUI.where).replace('{a}', termLabel(d.cur.m.red)).replace('{b}', termLabel(d.cur.m.black)).replace('{a}', termLabel(d.cur.m.red)).replace('{b}', termLabel(d.cur.m.black)) : tr(DXUI.setupTitle);
+      else text = tr(d.phase === 'review' ? DXUI.resultTitle : DXUI.conclTitle);
+    } else if (app.mode === 'assess') { const t = curTask(); text = t ? tr(t.title) : ''; } else if (!app.finished) {
       const s = curStep(); const guided = app.mode === 'guided' && !s.independent;
       text = guided || app.ctx.hint ? spokenPlain(s.action) : spokenPlain(s.goal);
     }
@@ -950,6 +1127,7 @@ sim.on((ev) => {
 sim.guards.push((action) => {
   const s = curStep();
   if (action === 'touch' && s && s.predict && app.ctx && app.ctx.predicted === undefined && !app.finished) return 'predict_first';
+  if (action === 'touch' && app.mode === 'diagnose' && app.dx.stage === 'run' && app.dx.s.phase === 'measure' && app.dx.s.predicted === undefined) return 'predict_first';
   return null;
 });
 
@@ -986,6 +1164,12 @@ const ACTIONS = {
     const k = d.key;
     if (k === 'probe:tip') { showInfo(k); sim.grip('red', 'tip'); } else if (k === 'meter') { showInfo(k); inspect('meter'); } else showInfo(k);
   },
+  'dx-goal': (d) => { const g = GOALS.find((y) => y.id === d.id); app.dx.goal = g.id; if (g.scn) dxStart(g.scn); },
+  'dx-scn': (d) => dxStart(d.id),
+  'dx-predict': (d) => { if (app.dx.s) app.dx.s.predicted = Number(d.i); },
+  'dx-continue': () => dxContinue(),
+  'dx-again': () => dxStart(app.dx.s.scn),
+  'dx-pick': () => { app.dx.stage = 'pick'; app.dx.goal = null; app.dx.s = null; app.coach = null; sim.reset(); app.ui.rest = 'home'; if (scene) scene.focus('front'); },
   'next-lesson': () => startLesson(Math.min(LESSONS.length - 1, app.lessonIdx + 1)),
   'go-assess': () => setMode('assess'),
   'as-start': () => startAssessment(),
@@ -1004,7 +1188,7 @@ const ACTIONS = {
 function setMode(m) {
   app.mode = m; save(); paintChrome();
   app.coach = null; app.info = null;
-  if (m === 'assess') { app.as = { started: false, idx: 0, results: {}, submitted: false, feedback: null, notes: new Set(), report: false }; app.ctx = newCtx(); sim.reset(); app.ui.rest = 'home'; if (scene) scene.focus('front'); } else startLesson(app.lessonIdx);
+  if (m === 'diagnose') { app.dx.stage = 'pick'; app.dx.goal = null; app.dx.s = null; app.ctx = newCtx(); app.finished = false; sim.reset(); app.ui.rest = 'home'; app.ui.selected = null; if (scene) scene.focus('front'); } else if (m === 'assess') { app.as = { started: false, idx: 0, results: {}, submitted: false, feedback: null, notes: new Set(), report: false }; app.ctx = newCtx(); sim.reset(); app.ui.rest = 'home'; if (scene) scene.focus('front'); } else startLesson(app.lessonIdx);
   dirty = true;
 }
 
@@ -1046,6 +1230,7 @@ document.addEventListener('toggle', (e) => {
 $('btn-narr').addEventListener('click', () => { app.narration = !app.narration; if (!app.narration && canSpeak) speechSynthesis.cancel(); save(); paintChrome(); if (app.narration) narrateStep(); });
 $('btn-cap').addEventListener('click', () => { app.captions = !app.captions; save(); paintChrome(); dirty = true; });
 $('btn-help').addEventListener('click', () => $('help').showModal());
+$('btn-diag').addEventListener('click', () => { setMode('diagnose'); }); 
 
 // ---------------------------------------------------------------------------
 // Boot and main loop
@@ -1061,7 +1246,7 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   sim.tick(dt);
-  if (app.mode !== 'assess') evaluate();
+  if (app.mode === 'diagnose') dxTick(); else if (app.mode !== 'assess') evaluate();
   resolveErrors(null);
   paintT += dt;
   if (dirty || paintT > 0.12) { dirty = false; paintT = 0; paint(); }
@@ -1071,4 +1256,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__voltageLab = { sim, app, scene, LESSONS, TASKS, actions: ACTIONS, clickPart, pickUp, chooseTerm, perform };
+window.__voltageLab = { sim, app, scene, SCENARIOS, LESSONS, TASKS, actions: ACTIONS, clickPart, pickUp, chooseTerm, perform };
