@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--page-->
+<title>First Shift Bootcamp</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="css/styles.css">
+<!--/page-->
+</head>
+<body>
+<!--page-->
+<div class="app" id="app">
+  <header class="top">
+    <div class="top-in">
+      <div class="brand"><span class="hazard" aria-hidden="true"></span><div><strong>FIRST SHIFT</strong><span>Maintenance Interview Bootcamp</span></div></div>
+      <div class="lesson-title" id="lessonTitle"></div>
+      <nav class="top-nav" aria-label="Main">
+        <button class="navbtn" id="btnLessons">Lessons</button>
+        <button class="navbtn" id="btnPaths">Study path</button>
+        <button class="navbtn" id="btnReview">Before the interview</button>
+        <button class="navbtn" id="btnSettings">Settings</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="grid" id="grid">
+    <section class="pane equip" aria-label="Equipment view">
+      <div class="pane-h"><h2>Equipment</h2><div class="stations" id="stations" role="group" aria-label="Go to station"></div></div>
+      <div class="view3d" id="view3d" tabindex="0" aria-label="Training room. Drag to look around, scroll to zoom, click a part to select it. Every part is also in the list below."></div>
+      <p class="view-note" id="viewNote">Drag to look around · scroll to zoom · click a part</p>
+      <div class="chips" id="chips"></div>
+    </section>
+
+    <section class="pane schem" id="schemPane" aria-label="Schematic">
+      <div class="pane-h"><h2 id="schemTitle">Schematic</h2><div class="tabs" id="tabs" role="tablist" aria-label="Drawing views"></div><button class="btn small" id="btnExpand" aria-pressed="false">Full screen</button></div>
+      <div class="convention" id="convention"></div>
+      <div class="diagram" id="diagram"></div>
+      <details class="legend" id="legend" open><summary>Legend for this drawing</summary><div id="legendBody"></div></details>
+    </section>
+
+    <section class="pane mentor" aria-label="Mentor instructions and component explanation">
+      <div class="mentor-scroll">
+        <div id="mentor"></div>
+        <div class="help" id="help" role="group" aria-label="Built-in help">
+          <button class="hbtn" data-help="what">What is this?</button>
+          <button class="hbtn" data-help="how">How does it work?</button>
+          <button class="hbtn" data-help="why">Why did that happen?</button>
+          <button class="hbtn" data-help="path">Show the path.</button>
+          <button class="hbtn" data-help="hint">Give me a hint.</button>
+          <button class="hbtn" data-help="reset">Reset this exercise.</button>
+        </div>
+        <div id="helpOut" role="status" aria-live="polite"></div>
+        <div id="compCard" class="comp-card" hidden></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bottom" aria-label="Simulation controls and lesson progress">
+    <div class="bottom-in">
+      <div class="b-sec"><h2>Simulation controls</h2><div class="controls" id="controls"></div></div>
+      <div class="b-sec meter" id="meter"></div>
+      <div class="b-sec progress" id="progress"></div>
+    </div>
+  </footer>
+</div>
+
+<div class="overlay" id="overlay" hidden></div>
+<div class="review" id="review" hidden></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/symbols.js"></script>
+<script src="js/diagrams.js"></script>
+<script src="js/schematic.js"></script>
+<script src="js/data/components.js"></script>
+<script src="js/data/lessons.js"></script>
+<script src="js/data/scenarios.js"></script>
+<script src="js/data/quiz.js"></script>
+<script src="js/scene3d.js"></script>
+<script src="js/scene2d.js"></script>
+<script src="js/app.js"></script>
+<!--/page-->
+</body>
+</html>
