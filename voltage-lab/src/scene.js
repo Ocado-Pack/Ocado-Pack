@@ -447,6 +447,115 @@ export function createScene(container, sim, ctl) {
   addTerminal('ac2', acg, 0.6, 1.31, 0.1, 'AC 2', 0.95, 1.95, 0.1);
   title('stAC', 7.6, 4.9, 0.3);
 
+
+  // ---- control training station (Build a Circuit / Verify a Repair) --------
+  // A second bench area. Every device mirrors ctl.ui.station, which is derived
+  // from the same runtime as the schematic.
+  const SX = 26;
+  mesh(box(13, 0.5, 7.4), mat(0xd8c9ae, { roughness: 0.8 }), scene, [SX, -0.26, 0.2], { type: 'bench' });
+  mesh(box(12.4, 0.03, 6.8), mat(0xa9b9c1, { roughness: 0.95 }), scene, [SX, 0.0, 0.2], { type: 'bench' });
+  const stn = new THREE.Group(); stn.position.set(SX, 0, 0); scene.add(stn);
+  mesh(box(11.2, 0.14, 5.0), mat(0xe3e9ee, { roughness: 0.85 }), stn, [0, 0.07, 0]);
+  const stDev = {};
+  const stState = () => (ctl.ui.station && ctl.ui.station.state) || {};
+  const stLabel = (id, x, y, z) => {
+    const sp = makeSprite('', { h: 0.34, bg: '#ffffff', fg: '#10222c', border: '#10222c' });
+    stn.updateMatrixWorld(true);
+    sp.position.copy(stn.localToWorld(V3(x, y, z)));
+    scene.add(sp);
+    dynLabels.push(() => {
+      const st = ctl.ui.station;
+      const on = !!(st && st.show && st.parts[id]);
+      sp.visible = on;
+      if (on) sp.userData.set(st.labels[id] || id);
+    });
+    return sp;
+  };
+  const stGroup = (id, x, z) => { const g = new THREE.Group(); g.position.set(x, 0.14, z); stn.add(g); stDev[id] = { g }; return g; };
+  const stKnife = (id, x, z) => {
+    const g = stGroup(id, x, z);
+    mesh(box(1.5, 0.1, 0.5), mat(0x5f6b75), g, [0, 0.05, 0]);
+    post(g, -0.5, 0.2, 0, 0.1, 0.3); post(g, 0.5, 0.15, 0, 0.1, 0.2);
+    const lever = new THREE.Group(); lever.position.set(-0.5, 0.33, 0); g.add(lever);
+    mesh(box(1.1, 0.07, 0.16), brass, lever, [0.5, 0, 0]);
+    mesh(cyl(0.11, 0.11, 0.36, 14), mat(0x15191c), lever, [1.1, 0.16, 0]);
+    mesh(box(1.5, 1.1, 0.9), ghost, g, [0, 0.55, 0], { type: 'st', id });
+    stDev[id].lever = lever;
+    stLabel(id, x, 0.5, z + 0.85);
+  };
+  const stButton = (id, x, z, color, mark) => {
+    const g = stGroup(id, x, z);
+    mesh(cyl(0.5, 0.5, 0.12, 24), mat(0x48525a), g, [0, 0.06, 0]);
+    const cap = mesh(cyl(0.36, 0.36, 0.3, 24), mat(color, { roughness: 0.4 }), g, [0, 0.3, 0], { type: 'st', id });
+    const f = makeFlat(mark, 0.34, { fg: '#ffffff' }); f.rotation.x = -Math.PI / 2; f.position.set(0, 0.16, 0); cap.add(f);
+    mesh(cyl(0.6, 0.6, 0.7, 10), ghost, g, [0, 0.35, 0], { type: 'st', id });
+    stDev[id].cap = cap;
+    stLabel(id, x, 0.5, z + 0.85);
+  };
+  stKnife('Q1', -4.4, -1.5); stKnife('SA', -2.0, -1.5); stKnife('SB', 0.4, -1.5);
+  stButton('STOP', -2.0, 0.9, 0xb3261e, 'O'); stButton('START', 0.4, 0.9, 0x1d6b3a, 'I');
+  // lock tag on Q1
+  const lockTag = mesh(box(0.34, 0.5, 0.1), mat(0xb3261e), stDev.Q1.g, [0.75, 0.5, 0.25]);
+  // overload relay F1 with TEST and RESET
+  { const g = stGroup('F1', -4.4, 0.9);
+    mesh(box(1.5, 0.8, 1.0), mat(0x2f4858), g, [0, 0.4, 0]);
+    [['F1test', -0.4, 'TEST', 0x8a4b00], ['F1reset', 0.4, 'RESET', 0x0b4f8a]].forEach(([id, x, text, color]) => {
+      const b = mesh(cyl(0.2, 0.2, 0.2, 16), mat(color), g, [x, 0.9, 0.15], { type: 'st', id });
+      mesh(cyl(0.34, 0.34, 0.5, 8), ghost, g, [x, 0.95, 0.15], { type: 'st', id });
+      const f = makeFlat(text, 0.16, { fg: '#ffffff' }); f.rotation.x = -Math.PI / 2; f.position.set(x, 0.81, -0.25); g.add(f);
+      void b;
+    });
+    stDev.F1.flag = mesh(box(0.5, 0.12, 0.12), mat(0xf0b429), g, [0, 0.86, 0.42]);
+    stLabel('F1', -4.4, 0.5, 1.95); }
+  // contactor K1
+  { const g = stGroup('K1', 2.6, 0.9);
+    mesh(box(1.4, 0.9, 1.1), mat(0x3b4852), g, [0, 0.45, 0]);
+    stDev.K1.arm = mesh(box(0.7, 0.3, 0.5), mat(0xf0b429), g, [0, 1.05, 0]);
+    stLabel('K1', 2.6, 0.5, 1.95); }
+  // lamp H1
+  { const g = stGroup('H1', 2.6, -1.4);
+    mesh(cyl(0.42, 0.5, 0.35, 24), mat(0x48525a), g, [0, 0.18, 0]);
+    const bm = new THREE.MeshStandardMaterial({ color: 0xfff6d5, emissive: 0xffc233, emissiveIntensity: 0, roughness: 0.2, transparent: true, opacity: 0.92 });
+    const bulb = mesh(new THREE.SphereGeometry(0.42, 24, 16), bm, g, [0, 0.7, 0]); bulb.castShadow = false;
+    const light = new THREE.PointLight(0xffc860, 0, 7, 1.6); light.position.set(0, 1.2, 0); g.add(light);
+    stDev.H1.bm = bm; stDev.H1.light = light; stDev.H1.level = 0;
+    stLabel('H1', 2.6, 0.5, -0.5); }
+  // motor M1 (rotor disc with a bar) and cylinder A (rod)
+  { const g = stGroup('M1', 4.6, -0.2);
+    const motor = new THREE.Group(); g.add(motor);
+    mesh(box(1.5, 0.2, 1.7), mat(0x48525a), motor, [0, 0.1, 0]);
+    const body = mesh(cyl(0.72, 0.72, 1.5, 28), mat(0x2f5d50, { roughness: 0.5 }), motor, [0, 0.9, -0.1]); body.rotation.x = Math.PI / 2;
+    const rotor = new THREE.Group(); rotor.position.set(0, 0.9, 0.72); motor.add(rotor);
+    const disc = mesh(cyl(0.6, 0.6, 0.08, 28), mat(0xd9dee3, { metalness: 0.6, roughness: 0.4 }), rotor, [0, 0, 0]); disc.rotation.x = Math.PI / 2;
+    mesh(box(1.1, 0.16, 0.06), mat(0x15191c), rotor, [0, 0, 0.06]);
+    const cylA = new THREE.Group(); g.add(cylA);
+    mesh(box(1.5, 0.2, 1.0), mat(0x48525a), cylA, [0, 0.1, 0]);
+    const cb = mesh(cyl(0.34, 0.34, 1.2, 20), mat(0x7b8a94, { metalness: 0.5 }), cylA, [-0.1, 0.6, 0]); cb.rotation.z = Math.PI / 2;
+    const rod = mesh(cyl(0.12, 0.12, 1.1, 14), steel, cylA, [0.3, 0.6, 0]); rod.rotation.z = Math.PI / 2;
+    mesh(box(0.14, 0.5, 0.5), mat(0x15191c), rod, [0, -0.55, 0]);
+    Object.assign(stDev.M1, { motor, rotor, cylA, rod, ext: 0 });
+    stLabel('M1', 4.6, 0.5, 1.35); }
+  const stTitle = makeFlat('', 0.3); stTitle.rotation.x = -Math.PI / 2; stTitle.position.set(SX, 0.03, 3.05); scene.add(stTitle);
+  dynLabels.push(() => { const st = ctl.ui.station; if (st && st.title) stTitle.userData.set(st.title); });
+
+  function updateStation(dt, calm) {
+    const st = ctl.ui.station;
+    stn.visible = true;
+    if (!st || !st.show) return;
+    const v = st.state; const k = calm ? 1 : 1 - Math.exp(-dt * 12);
+    Object.keys(stDev).forEach((id) => { stDev[id].g.visible = !!st.parts[id]; });
+    const lev = (id, closed) => { const d = stDev[id]; d.lever.rotation.z += ((closed ? 0 : 0.6) - d.lever.rotation.z) * k; };
+    lev('Q1', v.power); lev('SA', v.on && v.on.SA); lev('SB', v.on && v.on.SB);
+    lockTag.visible = !!v.lock;
+    ['START', 'STOP'].forEach((id) => { const c = stDev[id].cap; c.position.y += ((v.pressed && v.pressed[id] ? 0.16 : 0.3) - c.position.y) * k; });
+    stDev.F1.flag.position.y += ((v.tripped ? 1.05 : 0.86) - stDev.F1.flag.position.y) * k;
+    stDev.K1.arm.position.y += ((v.K1 ? 0.92 : 1.05) - stDev.K1.arm.position.y) * k;
+    const h1 = stDev.H1; h1.level += ((v.lamp ? 1 : 0) - h1.level) * k; h1.bm.emissiveIntensity = h1.level * 2.4; h1.light.intensity = h1.level * 14;
+    const m = stDev.M1; const cylMode = st.actuator === 'cylinder';
+    m.motor.visible = !cylMode; m.cylA.visible = cylMode;
+    if (cylMode) { m.ext += ((v.act ? 1 : 0) - m.ext) * k; m.rod.position.x = 0.3 + m.ext * 0.7; } else if (v.act && !calm) m.rotor.rotation.z -= dt * 9;
+  }
+
   // ---- test leads ----------------------------------------------------------
   const leads = {};
   ['black', 'red'].forEach((lead) => {
@@ -528,6 +637,7 @@ export function createScene(container, sim, ctl) {
   }
   function viewPose(name) {
     if (name === 'front' || !name) return frontPose();
+    if (name === 'station') { const t = V3(SX, 0.4, 0.7); return { t, p: t.clone().add(V3(0, 6.4, 6.4).multiplyScalar(fit())) }; }
     if (name === 'display' || name === 'dial' || name === 'jacks') {
       const y = name === 'display' ? 2.1 : name === 'dial' ? -0.6 : -2.2;
       const d = (name === 'display' ? 5.4 : name === 'dial' ? 6.4 : 6.6) * fit();
@@ -552,7 +662,7 @@ export function createScene(container, sim, ctl) {
   }
   function focus(name, instant) {
     const { t, p } = viewPose(name);
-    if (instant) { camera.position.copy(p); controls.target.copy(t); controls.update(); tween = null; return; }
+    if (instant || ctl.ui.calm) { camera.position.copy(p); controls.target.copy(t); controls.update(); tween = null; return; }
     tween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: p, t1: t, k: 0 };
   }
   controls.addEventListener('start', () => { tween = null; });
@@ -562,12 +672,12 @@ export function createScene(container, sim, ctl) {
   }
 
   function resize() {
-    const w = container.clientWidth || 1; const h = container.clientHeight || 1;
+    const w = canvas.clientWidth || container.clientWidth || 1; const h = canvas.clientHeight || container.clientHeight || 1;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
-  new ResizeObserver(resize).observe(container);
+  new ResizeObserver(resize).observe(canvas);
   resize();
   focus('front', true);
 
@@ -721,6 +831,7 @@ export function createScene(container, sim, ctl) {
   const q = new THREE.Quaternion();
   let labelT = 1;
   let time = 0;
+  let lowfx = false;
 
   function leadTargets(lead) {
     const s = sim.state;
@@ -786,7 +897,8 @@ export function createScene(container, sim, ctl) {
       if (tween.k >= 1) tween = null;
     }
     // keep the orbit target on the bench
-    controls.target.x = Math.max(-9, Math.min(11.5, controls.target.x));
+    const stnArea = ctl.ui.area === 'station';
+    controls.target.x = Math.max(stnArea ? SX - 5 : -9, Math.min(stnArea ? SX + 5 : 11.5, controls.target.x));
     controls.target.z = Math.max(-4, Math.min(6, controls.target.z));
     controls.target.y = Math.max(0, Math.min(3, controls.target.y));
     controls.update();
@@ -806,6 +918,14 @@ export function createScene(container, sim, ctl) {
     });
     updateLead('black', dt); updateLead('red', dt);
     drawLCD();
+    updateStation(dt, !!ctl.ui.calm);
+    if (!!ctl.ui.lowfx !== lowfx) {
+      lowfx = !!ctl.ui.lowfx;
+      renderer.shadowMap.enabled = !lowfx;
+      renderer.setPixelRatio(lowfx ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+      scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
+      resize();
+    }
 
     labelT += dt;
     if (labelT > 0.15) {
@@ -823,7 +943,8 @@ export function createScene(container, sim, ctl) {
     // guided highlights
     const keys = (ctl.ui.highlights || []).filter((key) => anchors[key]);
     const sel = ctl.ui.selected;
-    const pulse = 1 + 0.12 * Math.sin(time * 5);
+    const calm = !!ctl.ui.calm;
+    const pulse = calm ? 1 : 1 + 0.12 * Math.sin(time * 5);
     markers.forEach((m, i) => {
       const key = keys[i];
       if (!key) { m.r.visible = m.a.visible = false; return; }
@@ -832,7 +953,7 @@ export function createScene(container, sim, ctl) {
       const size = Math.max(0.5, dist * 0.055);
       m.r.visible = m.a.visible = true;
       m.r.position.copy(p); m.r.scale.setScalar(size * 1.5 * pulse);
-      m.a.position.copy(p).add(V3(0, size * 1.6 + 0.12 * Math.sin(time * 5), 0)); m.a.scale.set(size * 0.75, size, 1);
+      m.a.position.copy(p).add(V3(0, size * 1.6 + (calm ? 0 : 0.12 * Math.sin(time * 5)), 0)); m.a.scale.set(size * 0.75, size, 1);
     });
     void sel;
     renderer.render(scene, camera);

@@ -5,6 +5,8 @@ import { LESSONS } from './lessons.js';
 import { TASKS, ERROR_LESSON } from './assessment.js';
 import { renderDiagram, diagramTerms, drawWave } from './diagrams.js';
 import { createScene } from './scene.js';
+import { createModules } from './modules.js';
+import { answerOf } from './review.js';
 import { SCENARIOS, GOALS, DXUI, newSession, recommend, consistent, outcomes, healthyValue, predictOptions, fmtV, hyp as dxHyp, meas as dxMeas, tol as dxTol } from './diagnose.js';
 
 const $ = (id) => document.getElementById(id);
@@ -18,7 +20,7 @@ const store = (() => { try { return JSON.parse(localStorage.getItem('voltage-lab
 const save = () => { try { localStorage.setItem('voltage-lab', JSON.stringify({ lang: getLang(), mode: app.mode, narration: app.narration, captions: app.captions, completed: app.completed })); } catch (e) { /* storage unavailable */ } };
 
 const app = {
-  mode: ['guided', 'practice', 'assess'].includes(store.mode) ? store.mode : 'guided',
+  mode: 'home',
   narration: !!store.narration,
   captions: store.captions !== false,
   completed: store.completed || {},
@@ -34,7 +36,9 @@ setLang(store.lang || ((navigator.language || 'en').toLowerCase().startsWith('es
 
 const newCtx = () => ({ events: [], clicked: new Set(), form: {} });
 const lesson = () => LESSONS[app.lessonIdx];
-const curStep = () => (app.mode === 'assess' || app.mode === 'diagnose' ? null : lesson().steps[app.stepIdx]);
+const MODS = ['home', 'build', 'verify', 'packs', 'review'];
+const isMod = () => MODS.includes(app.mode);
+const curStep = () => (app.mode === 'guided' || app.mode === 'practice' ? lesson().steps[app.stepIdx] : null);
 const curTask = () => (app.mode === 'assess' && app.as.started && !app.as.report ? TASKS[app.as.idx] : null);
 const termLabel = (id) => (id && TERMINALS[id] && TERMINALS[id].label) || '—';
 const colorName = (lead) => tr(lead === 'red' ? UI.red : UI.black);
@@ -223,6 +227,7 @@ function clickPart(part, fromDemo) {
       break;
     case 'term': chooseTerm(part.id); break;
     case 'switch': sim.toggleSwitch(part.id); break;
+    case 'st': mods.stationClick(part.id); break;
     default:
   }
   dirty = true;
@@ -701,8 +706,11 @@ function keyOf(el) {
   if (!el || !el.dataset) return null;
   if (el.id) return `#${el.id}`;
   const d = el.dataset;
-  if (d.act) return `${d.act}|${[d.i, d.item, d.term, d.lead, d.pos, d.r, d.id, d.key, d.v].join('|')}`;
+  if (d.act) return `${d.act}|${[d.i, d.item, d.term, d.lead, d.pos, d.r, d.id, d.key, d.v, d.t, d.k, d.mode].join('|')}`;
   if (d.term) return `term|${d.term}`;
+  if (d.comp) return `comp|${d.comp}`;
+  if (d.wire) return `wire|${d.wire}`;
+  if (d.meas) return `meas|${d.meas}`;
   return null;
 }
 function setRegion(id, html) {
@@ -715,7 +723,7 @@ function setRegion(id, html) {
   const selPos = inside && act.selectionStart != null ? [act.selectionStart, act.selectionEnd] : null;
   el.innerHTML = html;
   if (key) {
-    const cand = [...el.querySelectorAll('[data-act],[data-term],input,select')].find((x) => keyOf(x) === key);
+    const cand = [...el.querySelectorAll('[data-act],[data-term],[data-comp],[data-wire],[data-meas],[id],input,select,textarea')].find((x) => keyOf(x) === key);
     if (cand) {
       cand.focus({ preventScroll: true });
       if (selPos && cand.setSelectionRange) { try { cand.setSelectionRange(selPos[0], selPos[1]); } catch (e) { /* not a text field */ } }
@@ -736,6 +744,8 @@ function paintChrome() {
   const sm = $('sel-mode');
   sm.options[0].textContent = tr(UI.guided); sm.options[1].textContent = tr(UI.practice); sm.options[2].textContent = tr(UI.assessment); sm.options[3].textContent = tr(DXUI.mode);
   $('btn-diag').textContent = tr(DXUI.btn);
+  MODS.forEach((m, i) => { sm.options[4 + i].textContent = mods.title(m); });
+  $('btn-home').textContent = mods.title('home');
   sm.value = app.mode;
   $('sel-lang').value = getLang();
   const nb = $('btn-narr');
@@ -757,6 +767,7 @@ function paintChrome() {
 }
 
 function navHTML() {
+  if (isMod()) return `<div class="card nav"><div class="nav-row"><h2 style="margin:0;flex:1">${esc(mods.title(app.mode))}</h2>${app.mode !== 'home' ? btn('m-go', esc(mods.title('home')), 'data-mode="home"') : ''}</div></div>`;
   if (app.mode === 'diagnose') {
     return `<div class="card nav"><div class="nav-row"><h2 style="margin:0;flex:1">${tr(DXUI.btn)}</h2>${app.dx.stage === 'run' ? btn('dx-pick', tr(DXUI.back)) : ''}</div><small>${tr(UI.simBadge)}</small></div>`;
   }
@@ -851,6 +862,7 @@ function logHTML() {
 const SEQ = () => tr(UI.sequence).replace(/\.$/, '').split(' → ');
 
 function stepHTML() {
+  if (isMod()) return mods.panel(app.mode);
   if (app.mode === 'assess') return assessHTML();
   if (app.mode === 'diagnose') return dxHTML();
   const L = lesson(); const s = curStep(); const c = app.ctx;
@@ -990,6 +1002,7 @@ function meterHTML() {
 }
 
 function diagramKind() {
+  if (isMod()) return 'none';
   if (app.mode === 'diagnose') { const scn = dxScn(); return app.dx.stage === 'run' && scn ? scn.diagram : 'none'; }
   if (app.mode === 'assess') { const t = curTask(); return t ? t.diagram : 'none'; }
   const s = curStep();
@@ -1054,6 +1067,7 @@ function glossHTML() {
 
 function highlights() {
   if (app.flash && performance.now() < app.flash.until) return app.flash.keys;
+  if (isMod()) return [];
   if (app.mode === 'diagnose') return dxHighlights();
   if (app.mode === 'assess' || app.finished) return [];
   const s = curStep(); const c = app.ctx;
@@ -1069,13 +1083,19 @@ function paint() {
   setRegion('r-nav', navHTML());
   setRegion('r-coach', coachHTML());
   setRegion('r-step', stepHTML());
-  setRegion('r-meter', meterHTML());
+  const mod = isMod();
+  setRegion('r-meter', mod ? '' : meterHTML());
   const dg = diagramHTML();
   setRegion('r-diagram', dg);
   setRegion('s-diagram', dg);
-  setRegion('r-check', checkHTML());
-  setRegion('r-controls', controlsHTML());
-  setRegion('r-gloss', glossHTML());
+  setRegion('r-check', mod ? '' : checkHTML());
+  setRegion('r-controls', mod ? '' : controlsHTML());
+  setRegion('r-gloss', mod ? '' : glossHTML());
+  const split = app.mode === 'build' || app.mode === 'verify';
+  const stage = $('stage');
+  if (split) stage.dataset.work = app.workView || 'both'; else delete stage.dataset.work;
+  $('app').classList.toggle('working', split);
+  setRegion('work', mods.workHTML());
   const timer = $('timer');
   if (timer) {
     const sec = Math.floor((performance.now() - app.started) / 1000);
@@ -1087,6 +1107,7 @@ function paint() {
   let text = '';
   if (app.captions) {
     if (app.caption && performance.now() < app.caption.until) text = app.caption.text;
+    else if (isMod()) text = mods.caption(app.mode);
     else if (app.mode === 'diagnose') {
       const d = app.dx.s;
       if (app.dx.stage !== 'run' || !d) text = tr(DXUI.pickQ);
@@ -1180,6 +1201,7 @@ const ACTIONS = {
   'as-practice': (d) => { app.mode = 'practice'; save(); paintChrome(); startLesson(Number(d.i)); },
   view: (d) => {
     if (!scene) return;
+    if (app.mode === 'build' || app.mode === 'verify') { scene.focus('station'); return; }
     if (d.v === 'bench') { const s = curStep(); const t = curTask(); const k = diagramKind(); scene.focus(k && k !== 'none' && k !== 'analogy' && k !== 'wave' ? k : (s && s.focus) || (t && t.focus) || 'front'); } else scene.focus(d.v);
   },
   zoom: (d) => scene && scene.zoom(Number(d.f)),
@@ -1188,6 +1210,17 @@ const ACTIONS = {
 function setMode(m) {
   app.mode = m; save(); paintChrome();
   app.coach = null; app.info = null;
+  const station = m === 'build' || m === 'verify';
+  app.ui.area = station ? 'station' : 'bench';
+  if (isMod()) {
+    app.ctx = newCtx(); app.finished = false; app.ui.selected = null; app.ui.highlights = []; sim.reset(); app.ui.rest = 'home';
+    if (station && !app.workView) app.workView = window.matchMedia && window.matchMedia('(max-width: 900px)').matches ? 'sch' : 'both';
+    mods.enter(m);
+    if (scene) scene.focus(station ? 'station' : 'front');
+    const p = $('panel'); if (p) p.scrollTop = 0;
+    dirty = true;
+    return;
+  }
   if (m === 'diagnose') { app.dx.stage = 'pick'; app.dx.goal = null; app.dx.s = null; app.ctx = newCtx(); app.finished = false; sim.reset(); app.ui.rest = 'home'; app.ui.selected = null; if (scene) scene.focus('front'); } else if (m === 'assess') { app.as = { started: false, idx: 0, results: {}, submitted: false, feedback: null, notes: new Set(), report: false }; app.ctx = newCtx(); sim.reset(); app.ui.rest = 'home'; if (scene) scene.focus('front'); } else startLesson(app.lessonIdx);
   dirty = true;
 }
@@ -1202,12 +1235,12 @@ function onClick(e) {
     return;
   }
   const tp = e.target.closest('[data-term]');
-  if (tp && !app.demo) { chooseTerm(tp.dataset.term); dirty = true; }
+  if (tp && !app.demo && !e.target.closest('#work')) { chooseTerm(tp.dataset.term); dirty = true; }
 }
 document.addEventListener('click', onClick);
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && app.ui.selected) { app.ui.selected = null; dirty = true; }
-  const tp = e.target.closest && e.target.closest('svg [data-term]');
+  const tp = e.target.closest && !e.target.closest('#work') && e.target.closest('svg [data-term]');
   if (tp && (e.key === 'Enter' || e.key === ' ') && !app.demo) { e.preventDefault(); chooseTerm(tp.dataset.term); dirty = true; }
 });
 document.addEventListener('change', (e) => {
@@ -1215,29 +1248,40 @@ document.addEventListener('change', (e) => {
   if (t.id === 'sel-lesson') startLesson(Number(t.value));
   else if (t.id === 'sel-mode') setMode(t.value);
   else if (t.id === 'sel-lang') { setLang(t.value); save(); paintChrome(); if (scene) scene.refreshLabels(); narrateStep(); } else if (t.dataset.plug && !app.demo) plugTo(t.dataset.plug, t.value || null);
+  else if (mods.onChange(t)) { /* handled by a training module */ }
   else if (t.id === 'f-sign') app.ctx.form.sign = t.value;
   else if (t.id === 'f-unit') app.ctx.form.unit = t.value;
   dirty = true;
 });
-document.addEventListener('input', (e) => { if (e.target.id === 'f-num' && app.ctx) app.ctx.form.num = e.target.value; });
+document.addEventListener('input', (e) => { if (e.target.id === 'f-num' && app.ctx) app.ctx.form.num = e.target.value; mods.onInput(e.target); });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.id === 'f-num') { if (app.mode === 'assess') { if (!app.as.submitted) submitTask(); } else submitEntry(); dirty = true; }
 });
 document.addEventListener('toggle', (e) => {
   if (e.target.id === 'controls') app.controlsOpen = e.target.open;
   if (e.target.id === 'gloss') app.glossOpen = e.target.open;
+  mods.onToggle(e.target);
 }, true);
 $('btn-narr').addEventListener('click', () => { app.narration = !app.narration; if (!app.narration && canSpeak) speechSynthesis.cancel(); save(); paintChrome(); if (app.narration) narrateStep(); });
 $('btn-cap').addEventListener('click', () => { app.captions = !app.captions; save(); paintChrome(); dirty = true; });
 $('btn-help').addEventListener('click', () => $('help').showModal());
-$('btn-diag').addEventListener('click', () => { setMode('diagnose'); }); 
+$('btn-diag').addEventListener('click', () => { setMode('diagnose'); });
+$('btn-home').addEventListener('click', () => { setMode('home'); });
 
 // ---------------------------------------------------------------------------
 // Boot and main loop
 // ---------------------------------------------------------------------------
+const mods = createModules({
+  app, tr, h, esc, btn, mark,
+  dirty: () => { dirty = true; },
+  setMode: (m) => setMode(m),
+  openDiagnose: (scn) => { setMode('diagnose'); dxStart(scn); },
+  openLesson: (i) => { app.lessonIdx = i; setMode('guided'); },
+});
+Object.assign(ACTIONS, mods.actions);
 const scene = createScene($('stage'), sim, ctl);
 paintChrome();
-if (app.mode === 'assess') setMode('assess'); else startLesson(0);
+setMode('home');
 if (!store.lang) { try { $('help').showModal(); } catch (e) { /* dialog unsupported */ } }
 
 let last = performance.now();
@@ -1246,6 +1290,7 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   sim.tick(dt);
+  app.ui.station = mods.stationState(); app.ui.lowfx = app.study.lowfx; app.ui.calm = app.study.calm;
   if (app.mode === 'diagnose') dxTick(); else if (app.mode !== 'assess') evaluate();
   resolveErrors(null);
   paintT += dt;
@@ -1256,4 +1301,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__voltageLab = { sim, app, scene, SCENARIOS, LESSONS, TASKS, actions: ACTIONS, clickPart, pickUp, chooseTerm, perform };
+window.__voltageLab = { sim, app, scene, SCENARIOS, mods, answerOf, LESSONS, TASKS, actions: ACTIONS, clickPart, pickUp, chooseTerm, perform };

@@ -45,8 +45,16 @@ Lesson buttons: **Show me** demonstrates the step, **Let me try** hands the equi
 back as it was, **Explain again** rephrases and re-highlights, **Reset** restores the
 start of the step. A step completes only when the actual equipment state is correct.
 
-Top bar: mode (Guided / Practice / Assessment), language (English / Español),
-narration on/off, captions on/off, Help.
+Top bar: Dashboard, mode, language (English / Español), Help me diagnose, narration
+on/off, captions on/off, Help. The app opens on the **Dashboard**, which lists every
+module.
+
+In **Build a Circuit**: click a palette component and then a grid position (or drag
+it); click one connection point and then another to add a wire; click a component or
+wire to select it, then Rotate or Remove. With the keyboard: Tab to the workspace,
+arrow keys move the placement cursor or the selected component, Enter places, R
+rotates, Delete removes. On the control station, clicking START or STOP presses it and
+clicking again releases it (this stands in for holding a finger on the button).
 
 ## What is in it
 
@@ -67,6 +75,28 @@ narration on/off, captions on/off, Help.
   measurement that separates them. It names a cause only when the readings leave one
   explanation, never from a single ambiguous reading, and states what voltage
   testing cannot establish. Each scenario cycles through several modelled cases.
+- **Build a Circuit**: four exercises that go from a description of behavior to a
+  working schematic (switch and lamp; two switches in series; two in parallel; START /
+  holding contact / STOP / overload). A snap-to-grid workspace with Undo, Redo, Clear
+  and Reset. Before anything runs, the wiring is checked for missing connections,
+  incomplete paths, wrong coil/contact association, supply shorts and bypassed
+  protective contacts. Behavior tests then run on the simulated circuit, so any
+  electrically equivalent layout passes. Hints come in three levels, with a worked
+  solution on request. The 3D control station follows the same circuit state.
+- **Verify a Repair**: diagnose a fault in the motor-starter teaching circuit from your
+  own operations and readings, complete simulated isolation steps, make an abstract
+  repair, then demonstrate nine operating checks that are recorded from the simulation.
+  One scenario starts with a colleague's incorrect repair. Ends with a repair report.
+- **Equipment Packs**: general (default), conveyor, motor starters, sensors and PLC
+  I/O, pneumatic actuators. Each has a glossary, bench models, a drawing legend, three
+  scenarios, five interview questions, expected behavior and verification checks.
+  Optional packs are separate files under `packs/` and are fetched when selected.
+  Includes a local Interview Equipment Notes field and a closest-pack recommendation.
+- **Review Due**: a local practice queue over eight concepts, with confidence ratings,
+  hints, a visible and editable schedule, "Practice for 5 Minutes" and "Review Before
+  My Interview", and copy/paste export and import of progress.
+- **Reduced graphics** and **reduced motion** switches on the Dashboard (reduced motion
+  follows the system setting by default).
 - **Pre-measurement check** that gates every probe contact: inspect, jacks, function,
   range, intended test points, fingers behind guards, no bridging.
 - **Error coaching** with what happened / why it matters / how to fix it / Retry for:
@@ -91,7 +121,32 @@ narration on/off, captions on/off, Help.
   digits show a small deterministic drift standing in for stray pickup — never a
   reliable zero.
 
+## Adding a pack
+
+A pack is one file, `packs/<id>.js`, that calls `window.VoltageLabPacks.register({...})`.
+The schema is documented at the top of `src/packs.js`. To add one: create the file, add
+its `id` and `name` to `PACK_LIST` in `src/packs.js`, and rebuild. Verified
+manufacturer-specific content uses the same shape with
+`source: { kind: 'verified', by, reference, date }`; the app then shows that source
+instead of the "representative" notice. Nothing else in the application has to change.
+
 ## Placeholders, simplifications and unsupported features
+
+- **Build a Circuit is not a general circuit editor.** Each exercise offers exactly its
+  own components, one of each, as two-terminal parts on a fixed grid between a +24 V
+  and a 0 V rail. The motor power circuit is pre-wired and not drawn by the learner.
+  Momentary pushbuttons are operated by click-to-press and click-to-release.
+- **Verify a Repair** has two scenarios on one teaching circuit, with five modelled
+  causes (each an open contact or coil). Isolation is a simplified training sequence,
+  not a site procedure, and the repair itself is a single button.
+- **Equipment packs are representative, not manufacturer-specific.** They change
+  vocabulary, legend, scenarios and questions; the sensors pack does not simulate a
+  PLC program and the pneumatic pack does not simulate air. Packs without a motor
+  starter use the general labels for the starter exercises. Interview notes are stored
+  as plain text and are never interpreted.
+- **Review Due** uses a fixed bank of 27 questions. Scheduling runs only while the page
+  is open; there are no notifications. Progress lives in this browser's local storage
+  and is lost if browser data is cleared — use export to keep a copy.
 
 - **Narration** uses the browser's built-in speech synthesis. Voice quality and
   Spanish availability depend on the device; some browsers have no voices at all.

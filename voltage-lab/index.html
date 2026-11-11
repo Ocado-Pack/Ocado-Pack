@@ -20,12 +20,18 @@
       <span class="badge" id="t-badge">Simulation only</span>
     </div>
     <div class="top-controls">
+      <button type="button" id="btn-home"></button>
       <label><span id="l-mode">Mode</span>
         <select id="sel-mode">
           <option value="guided">Guided</option>
           <option value="practice">Practice</option>
           <option value="assess">Assessment</option>
           <option value="diagnose">Diagnose</option>
+          <option value="home">Dashboard</option>
+          <option value="build">Build a Circuit</option>
+          <option value="verify">Verify a Repair</option>
+          <option value="packs">Equipment Packs</option>
+          <option value="review">Review Due</option>
         </select>
       </label>
       <label><span id="l-lang">Language</span>
@@ -49,6 +55,7 @@
       <p class="stage-help" id="stage-help"></p>
       <div class="caption" id="caption" role="status" aria-live="polite" hidden></div>
       <div class="inset" id="s-diagram"></div>
+      <div id="work"></div>
     </section>
     <aside id="panel" aria-label="Lesson panel">
       <div id="r-nav"></div>

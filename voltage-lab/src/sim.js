@@ -98,7 +98,7 @@ function solveLinear(A, b) {
 // Modified nodal analysis. Closed switches and intact wires merge nodes;
 // `meter` (a pair of node names) adds the voltmeter's input resistance.
 export function solveCircuit(cid, switches = {}, faults = {}, meter = null) {
-  const c = CIRCUITS[cid];
+  const c = typeof cid === 'string' ? CIRCUITS[cid] : cid; // a circuit id or a circuit description
   const parent = {};
   const find = (n) => {
     if (!(n in parent)) parent[n] = n;

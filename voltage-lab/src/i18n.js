@@ -238,6 +238,7 @@ export const UI = {
 <li><b>Test points:</b> with no probe in hand, clicking a test point marks it as one of your two intended points. You must do this before a probe may touch it.</li>
 <li><b>No mouse?</b> Every action is also available under “Equipment controls” and on the circuit diagram, with keyboard focus.</li>
 <li><b>Help me diagnose:</b> pick what you want to check and the guide tells you whether voltage can help, how to set the meter, where both probes go, and what each reading rules out.</li>
+<li><b>Dashboard:</b> opens every module. “Build a Circuit” turns a description of behavior into a schematic that drives the 3D control station; “Verify a Repair” makes you prove a repair; “Equipment Packs” adapts the vocabulary; “Review Due” brings weak concepts back.</li>
 <li><b>Lessons:</b> a step completes only when your actual setup is right. “Show me” demonstrates, “Let me try” hands the equipment back, “Explain again” rephrases, “Reset” restores the start of the step.</li>
 </ul>
 <p><b>Known limits:</b> narration uses your browser’s built-in voices and may be missing in some browsers or languages (captions always work). Resistance (Ω) and current (A) are identified but deliberately not simulated. The meter is a generic teaching model: real meters have different layouts, ranges and overrange displays — read your own meter’s manual.</p>`,
@@ -250,6 +251,7 @@ export const UI = {
 <li><b>Puntos de prueba:</b> sin punta en la mano, hacer clic en un punto lo marca como uno de tus dos puntos previstos. Debes hacerlo antes de que una punta pueda tocarlo.</li>
 <li><b>¿Sin ratón?</b> Todas las acciones están también en «Controles del equipo» y en el diagrama, con foco de teclado.</li>
 <li><b>Ayúdame a diagnosticar:</b> elige qué quieres comprobar y la guía te dice si el voltaje puede ayudar, cómo ajustar el medidor, dónde va cada punta y qué descarta cada lectura.</li>
+<li><b>Panel principal:</b> abre todos los módulos. «Construir un circuito» convierte una descripción del comportamiento en un esquema que mueve la estación de control 3D; «Verificar una reparación» te hace demostrar una reparación; «Paquetes de equipo» adapta el vocabulario; «Repaso pendiente» trae de vuelta los conceptos débiles.</li>
 <li><b>Lecciones:</b> un paso se completa solo cuando tu configuración real es correcta. «Muéstrame» demuestra, «Déjame intentar» te devuelve el equipo, «Explícalo otra vez» lo reformula, «Reiniciar» restaura el inicio del paso.</li>
 </ul>
 <p><b>Límites conocidos:</b> la narración usa las voces del navegador y puede faltar en algunos navegadores o idiomas (los subtítulos siempre funcionan). Resistencia (Ω) y corriente (A) se identifican pero no se simulan, a propósito. El medidor es un modelo didáctico genérico: los medidores reales tienen otras disposiciones, rangos e indicaciones de sobrerrango; lee el manual de tu medidor.</p>`),
