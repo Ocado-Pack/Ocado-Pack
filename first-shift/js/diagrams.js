@@ -161,7 +161,7 @@
     P('PB1', 'pb_nc', 150, 120, { comp: 'pb_nc', el: 'PB1', sub: 'STOP' }),
     P('OL1c', 'nc', 270, 120, { ref: 'OL1', comp: 'overload', el: 'OL1', sub: '95-96' }),
     P('PB2', 'pb_no', 420, 120, { comp: 'pb_no', el: 'PB2', sub: 'START' }),
-    P('M1aux', 'no', 420, 214, { ref: 'M1', comp: 'aux_contact', el: 'M1-AUX', sub: '13-14 holding' }),
+    P('M1aux', 'no', 420, 214, { ref: 'M1', comp: 'aux_contact', el: 'M1-AUX', sub: '13-14 hold' }),
     P('M1coil', 'coil', 590, 120, { ref: 'M1', comp: 'contactor_coil', el: 'M1', o: { t: 'M1' }, noRef: true, sub: 'coil A1-A2' })
   ];
   PY.forEach(function (y, i) {

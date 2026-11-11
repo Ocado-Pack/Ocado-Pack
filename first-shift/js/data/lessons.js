@@ -18,7 +18,7 @@
 
   /* ====================================================== LESSON 1 */
   L.push({
-    id: 'L1', title: 'What am I looking at?', short: 'Four kinds of drawing', minutes: 10, station: 'display',
+    id: 'L1', concept: 'nav', title: 'What am I looking at?', short: 'Four kinds of drawing', minutes: 10, station: 'display',
     tabs: [['lamp', 'Schematic'], ['view_wiring', 'Wiring'], ['view_layout', 'Layout'], ['view_block', 'Block']],
     steps: [
       { kind: 'say', title: 'Four drawings, one machine', diagram: 'view_block',
@@ -77,7 +77,7 @@
 
   /* ====================================================== LESSON 2 */
   L.push({
-    id: 'L2', title: 'Basic electricity through a simple circuit', short: 'Voltage, current, complete paths', minutes: 15, station: 'panel',
+    id: 'L2', concept: 'logic', title: 'Basic electricity through a simple circuit', short: 'Voltage, current, complete paths', minutes: 15, station: 'panel',
     steps: [
       { kind: 'say', title: 'Three words', diagram: 'lamp',
         text: '<b>Voltage</b> is the difference in electrical potential between two points. Think of it as the push available. It is always measured <i>between two points</i>.<br><b>Current</b> is charge actually flowing.<br><b>Resistance</b> is opposition to current.<br><br>Our supply PS1 gives 24 volts DC between its + and − terminals. Nothing flows until there is a path.',
@@ -86,6 +86,7 @@
         text: 'Current flows through a load only when there is a <b>complete path</b> from one source terminal, through the load, back to the other terminal. That is a <b>closed circuit</b>. Any gap makes it an <b>open circuit</b> and current stops everywhere in the loop.<br><br>PL1 is the <b>load</b>: it does the work. S1 is a <b>control device</b>: it only decides whether the path is complete. F1 is protection.',
         hints: ['Trace: PS1 +, F1, S1, wire 2, PL1, back to PS1 −.', 'S1 is drawn open. That gap means no complete path yet.', 'Load does the work; control devices open or close the path.'] },
       { kind: 'demo', title: 'Watch the path', diagram: 'lamp',
+        expect: { q: 'I am about to close S1. What do you expect to happen, and why?', choices: ['The lamp lights, because the path from L+ to 0V becomes complete', 'Nothing, because the fuse blocks the current', 'The lamp lights only while I hold the switch'], ok: 0 },
         text: 'I\'ll close S1, then open it again. The orange line with moving dashes shows where current is flowing. It is a simplified picture; it does not show how fast electrons really move.',
         script: [
           { ms: 600, set: { 'sw.S1': true }, note: 'S1 closed: the path is complete, current flows, PL1 lights.' },
@@ -145,7 +146,7 @@
 
   /* ====================================================== LESSON 3 */
   L.push({
-    id: 'L3', title: 'Component and symbol workbench', short: '28 core symbols', minutes: 30, station: 'bench',
+    id: 'L3', concept: 'sym', title: 'Component and symbol workbench', short: '28 core symbols', minutes: 30, station: 'bench',
     tabs: [['sheet:core', 'Core symbols'], ['sheet:optional', 'Optional']],
     steps: [
       { kind: 'say', title: 'The workbench', sheet: 'core',
@@ -159,46 +160,46 @@
       { kind: 'say', title: 'What "normal" means', sheet: 'core',
         text: 'The most important word on a schematic: <b>normally</b>.<br><br>"Normally open" and "normally closed" describe a contact in its <b>reference state</b>: not pressed, not actuated, coil de-energized. That is how the drawing shows it, whatever the machine is doing at the moment.<br><br>NO = open in the reference state, closes when operated.<br>NC = closed in the reference state, opens when operated.',
         hints: ['Compare the two relay contact cards.', 'The slash across a contact means normally closed in this style.', '"Normal" = unactuated / de-energized, as drawn.'] },
-      { kind: 'pick', title: 'Select the named symbol (1)', sheet: 'core',
+      { kind: 'pick', title: 'Select the named symbol (1)', cap: 'symbols', sheet: 'core',
         q: 'Select the <b>normally closed pushbutton</b>.', target: 'pb_nc',
         pool: ['pb_no', 'pb_nc', 'contact_no', 'contact_nc', 'selector', 'limit', 'breaker', 'fuse'],
         fbOk: 'Yes. The bar sits across the two terminals, so the path is closed until you press the button.',
         fbNo: 'Not that one. A pushbutton has a stem and a bar. Normally closed means the bar already bridges the terminals.',
         hints: ['Pushbuttons have a short vertical stem with a cap.', 'Normally closed: the bar touches both terminal circles before anyone presses it.', 'It is the pushbutton whose bar is drawn under and touching the terminals.'] },
-      { kind: 'pick', title: 'Select the named symbol (2)', sheet: 'core',
+      { kind: 'pick', title: 'Select the named symbol (2)', cap: 'symbols', sheet: 'core',
         q: 'Select the <b>normally open relay contact</b>.', target: 'contact_no',
         pool: ['contact_no', 'contact_nc', 'capacitor', 'pb_no', 'fuse', 'relay_coil', 'terminal', 'crossing'],
         fbOk: 'Yes. Two parallel bars with a gap: open until the coil with the same label energizes.',
         fbNo: 'Not that one. Look for two short parallel bars with nothing across them.',
         hints: ['A relay contact is two short parallel bars across the line.', 'Open means nothing bridges the two bars.', 'Two parallel bars, no slash. Careful: the capacitor has one curved plate.'] },
-      { kind: 'pick', title: 'Select the named symbol (3)', sheet: 'core',
+      { kind: 'pick', title: 'Select the named symbol (3)', cap: 'symbols', sheet: 'core',
         q: 'Select the <b>motor overload relay</b>.', target: 'overload',
         pool: ['overload', 'fuse', 'breaker', 'main_contacts', 'transformer', 'contactor_coil', 'motor', 'disconnect'],
         fbOk: 'Yes. A thermal element for the power circuit and a normally closed contact for the control circuit, both labelled OL1.',
         fbNo: 'Not that one. The overload relay shows two parts: a thermal element and a normally closed contact.',
         hints: ['It has two parts drawn side by side.', 'One part senses motor current, the other is a contact that opens on a trip.', 'The card with "element" and "contact" printed under it.'] },
-      { kind: 'ask', title: 'Open or closed as drawn? (1)', sheet: 'core', symbol: { sym: 'nc' },
+      { kind: 'ask', title: 'Open or closed as drawn? (1)', concept: 'nonc', cap: 'nonc', sheet: 'core', symbol: { sym: 'nc' },
         q: 'This contact is labelled CR1 and CR1\'s coil is de-energized. As drawn, is the contact open or closed?',
         choices: [
           { t: 'Closed', ok: true, fb: 'Right. The slash marks a normally closed contact. With the coil de-energized it is in its reference state: closed.' },
           { t: 'Open', fb: 'The slash across the bars marks it as normally closed. De-energized is the reference state, so it is closed.' }
         ],
         hints: ['Look for a diagonal slash.', 'Slash = normally closed in this style.', 'It is closed.'] },
-      { kind: 'ask', title: 'Open or closed as drawn? (2)', sheet: 'core', symbol: { sym: 'pb_no' },
+      { kind: 'ask', title: 'Open or closed as drawn? (2)', concept: 'nonc', cap: 'nonc', sheet: 'core', symbol: { sym: 'pb_no' },
         q: 'Nobody is touching this pushbutton. Is its contact open or closed?',
         choices: [
           { t: 'Closed', fb: 'The bar is drawn above the terminals, not touching them. Unpressed, this contact is open.' },
           { t: 'Open', ok: true, fb: 'Right. The bar is above the terminals with a gap. Pressing the button pushes it down to bridge them.' }
         ],
         hints: ['Is the bar touching the two terminal circles?', 'A gap means open in the reference state.', 'It is open: a normally open pushbutton.'] },
-      { kind: 'match', title: 'Match symbol to hardware', sheet: 'core', symbol: { sym: 'coil', o: { t: 'M1' } },
+      { kind: 'match', title: 'Match symbol to hardware', concept: 'coil', cap: 'symbols', sheet: 'core', symbol: { sym: 'coil', o: { t: 'M1' } },
         q: 'This symbol is on the control rung. Which part on the bench does it belong to?',
         bench: ['motor', 'contactor_coil', 'pilot', 'fuse'], answer: 'contactor_coil',
         opts: ['A blue finned housing with a shaft and a terminal box: a motor.', 'A beige block with three large screw terminals along the top and the bottom: a contactor.', 'A red lens in a metal collar: a pilot light.', 'A small cartridge clipped into a holder: a fuse.'],
         fbOk: 'Right. The circle labelled M1 is the coil inside the contactor. The motor is MTR1.',
         fbNo: 'Not that one. In this application M1 is the contactor, and its coil is inside the contactor body.',
         hints: ['Read the label inside the circle.', 'M1 is the contactor here; the motor is labelled MTR1.', 'The contactor: the block with three large terminals top and bottom.'] },
-      { kind: 'ask', predict: true, title: 'Predict: the coil energizes', diagram: 'ladD',
+      { kind: 'ask', predict: true, title: 'Predict: the coil energizes', concept: 'coil', diagram: 'ladD',
         q: 'On this drawing, S1 is about to close and energize coil CR1. What happens to the CR1 contact on rung 2?',
         choices: [
           { t: 'Nothing: no wire joins the coil to the contact', fb: 'There is no wire because none is needed. The coil moves its contacts mechanically inside the relay. The shared label CR1 is the link.' },
@@ -237,12 +238,12 @@
             'Abbreviations and reference labels are not universal. Read the legend of every drawing before trusting a label.' ] }
         ],
         hints: ['Compare the three symbols on the first card.', 'Only protective earth is there purely for safety.', 'PE = safety; 0V = DC return; N = AC conductor.'] },
-      { kind: 'pick', noHint: true, title: 'No-hint check (1)', sheet: 'core',
+      { kind: 'pick', noHint: true, title: 'No-hint check (1)', cap: 'symbols', sheet: 'core',
         q: 'Select the <b>protective earth</b> symbol.', target: 'earth',
         pool: ['earth', 'terminal', 'junction', 'pilot', 'transformer', 'solenoid', 'crossing', 'psu'],
         fbOk: 'Correct. A stem with three shrinking bars.',
         fbNo: 'Not that one. Protective earth is the stem with three horizontal bars getting shorter.' },
-      { kind: 'ask', noHint: true, title: 'No-hint check (2)', sheet: 'core', symbol: { sym: 'no' },
+      { kind: 'ask', noHint: true, title: 'No-hint check (2)', concept: 'nonc', cap: 'nonc', sheet: 'core', symbol: { sym: 'no' },
         q: 'This contact is labelled M1. M1\'s coil has just been energized. The contact is now…',
         choices: [
           { t: 'Closed', ok: true, fb: 'Correct. It is drawn normally open; energizing its coil closes it.' },
@@ -253,7 +254,7 @@
 
   /* ====================================================== LESSON 4 */
   L.push({
-    id: 'L4', title: 'Reading ladder diagrams', short: 'Rails, rungs, AND, OR', minutes: 25, station: 'display',
+    id: 'L4', concept: 'logic', title: 'Reading ladder diagrams', short: 'Rails, rungs, AND, OR', minutes: 25, station: 'display',
     tabs: [['ladA', 'A'], ['ladB', 'B · series'], ['ladC', 'C · parallel'], ['ladD', 'D · relay']],
     steps: [
       { kind: 'say', title: 'Rails and rungs', diagram: 'ladA',
@@ -303,13 +304,13 @@
           { ms: 600, set: { 'sw.S1': true }, sel: 'CR1', note: 'S1 closes. CR1 coil energizes. Its NO contact on rung 2 closes and PL1 lights.' },
           { ms: 2400, set: { 'sw.S1': false }, note: 'S1 opens. Coil drops out, contact opens, lamp off.' }
         ] },
-      { kind: 'trace', title: 'Trace the path (series)', diagram: 'ladB', preset: { 'sw.S1': true, 'sw.S2': true },
+      { kind: 'trace', title: 'Trace the path (series)', cap: 'trace', diagram: 'ladB', preset: { 'sw.S1': true, 'sw.S2': true },
         text: 'Trace mode. Click each <b>device</b> along the path that is carrying current from L+ to 0V, then press <b>Check path</b>.',
         hints: ['Start at the left rail and move right.', 'In series, the path goes through every device on the rung.', 'Click S1, S2 and PL1, then Check path.'] },
-      { kind: 'trace', title: 'Trace the path (parallel)', diagram: 'ladC', preset: { 'sw.S1': false, 'sw.S2': true },
+      { kind: 'trace', title: 'Trace the path (parallel)', cap: 'trace', diagram: 'ladC', preset: { 'sw.S1': false, 'sw.S2': true },
         text: 'S1 is open, S2 is closed, and the lamp is on. Trace the path that is actually conducting. If you try the S1 branch I\'ll show you where it stops.',
         hints: ['Check each switch\'s state tag.', 'A path through an open device is interrupted.', 'Click S2 and PL1, then Check path.'] },
-      { kind: 'trace', title: 'Trace the path (relay)', diagram: 'ladD', preset: { 'sw.S1': true },
+      { kind: 'trace', title: 'Trace the path (relay)', concept: 'coil', cap: 'trace', diagram: 'ladD', preset: { 'sw.S1': true },
         text: 'S1 is closed, so CR1 is energized. Trace the path that lights <b>PL1</b>.',
         need: 'PL1',
         hints: ['Which rung is PL1 on?', 'The lamp\'s current does not go through S1 or the coil. It goes through the CR1 contact.', 'Click the CR1 contact and PL1, then Check path.'] },
@@ -330,7 +331,7 @@
 
   /* ====================================================== LESSON 5 */
   L.push({
-    id: 'L5', title: 'START/STOP motor control', short: 'The three-wire holding circuit', minutes: 30, station: 'panel',
+    id: 'L5', concept: 'hold', title: 'START/STOP motor control', short: 'The three-wire holding circuit', minutes: 30, station: 'panel',
     steps: [
       { kind: 'say', title: 'Two circuits, one starter', diagram: 'starter',
         text: 'This is the circuit interviewers ask about most. There are two drawings.<br><br><b>Top: control circuit</b>, 24 VDC. It decides whether the contactor coil M1 is energized.<br><b>Bottom: power circuit</b>, three-phase. Supply, disconnect DS1, fuses, M1 main contacts, overload elements OL1, motor MTR1.<br><br>They are linked by the contactor: the coil is in the control circuit, the main contacts are in the power circuit.',
@@ -341,6 +342,7 @@
         text: 'Left to right:<br>1. <b>PB1 STOP</b>, normally closed.<br>2. <b>OL1</b> overload contact, normally closed.<br>3. A parallel branch: <b>PB2 START</b> (normally open) on top, the <b>M1 auxiliary contact</b> (normally open) underneath.<br>4. The <b>M1 coil</b>, then the return to 0V.<br><br>In logic: STOP-not-pressed AND overload-not-tripped AND (START OR M1-already-in).',
         hints: ['Series parts first, then the parallel pair, then the coil.', 'Series = AND, parallel = OR.', 'PB1 → OL1 → (PB2 or M1 aux) → M1 coil → 0V.'] },
       { kind: 'demo', title: 'Start, release, stop', diagram: 'starter',
+        expect: { q: 'I will press START and then let go. What do you expect the M1 coil to do when I release START, and why?', choices: ['It stays energized, because the M1 auxiliary contact gives the current another path', 'It drops out, because START is a momentary button', 'It stays energized, because START latches mechanically'], ok: 0 },
         text: 'Watch the wire numbers 2 and 3 and the holding branch.',
         script: [
           { ms: 700, set: { 'pb.PB2': true }, note: 'START pressed: the path is complete, the M1 coil energizes, main contacts close, the motor runs. The M1 auxiliary contact closes too.' },
@@ -353,7 +355,7 @@
         goal: function (S, R, ui) { return S.relay.M1 && !S.pb.PB2 && had(ui, 'pb.PB2:true'); },
         done: 'Still running with START released. The motor continues because the M1 auxiliary contact, in parallel with START, keeps the coil circuit complete. That is the holding (seal-in) circuit.',
         hints: ['START is a momentary button: hold it down, then release.', 'Watch the lower branch turn orange when you let go.', 'Hold the START button for a second, then release it.'] },
-      { kind: 'ask', predict: true, title: 'Predict: STOP', diagram: 'starter', preset: { run: true },
+      { kind: 'ask', predict: true, title: 'Predict: STOP', cap: 'predict', diagram: 'starter', preset: { run: true },
         q: 'The motor is running. You press STOP and let go again. What does the motor do after you release STOP?',
         choices: [
           { t: 'It restarts, because the STOP contact is closed again', fb: 'When the coil dropped out, the holding contact opened. With START also open there is no path, even though STOP has reclosed.' },
@@ -367,7 +369,7 @@
         goal: function (S) { return S.olTripped && !S.relay.M1; },
         done: 'The OL1 control contact opened, the coil dropped out and the motor stopped. The overload contact is in series with the coil for exactly this reason.',
         hints: ['The control is in the bottom bar.', 'A trip opens the normally closed OL1 contact (95-96).', 'Press "Trip overload".'] },
-      { kind: 'ask', predict: true, title: 'Predict: reset the overload', diagram: 'starter', preset: { olTripped: true },
+      { kind: 'ask', predict: true, title: 'Predict: reset the overload', cap: 'predict', diagram: 'starter', preset: { olTripped: true },
         q: 'The overload is tripped and the motor is stopped. Someone resets the overload. What happens?',
         choices: [
           { t: 'The motor restarts by itself', fb: 'Resetting closes the OL1 contact, but START and the holding contact are both still open, so the coil has no path.' },
@@ -376,7 +378,7 @@
         run: [{ olTripped: false }],
         verify: function (S, R) { return !S.relay.M1 && R.el.OL1.closed; },
         hints: ['After the reset, look at the parallel branch.', 'A closed OL1 contact is necessary, not sufficient.', 'It stays stopped until START.'] },
-      { kind: 'ask', predict: true, title: 'Predict: control power lost', diagram: 'starter', preset: { run: true },
+      { kind: 'ask', predict: true, title: 'Predict: control power lost', cap: 'predict', diagram: 'starter', preset: { run: true },
         q: 'The motor is running. Control power is lost for a moment, then comes back. What does the motor do?',
         choices: [
           { t: 'It restarts when power returns', fb: 'When power dropped, the coil de-energized and the holding contact opened. Power returning finds both parallel branches open.' },
@@ -399,7 +401,7 @@
         goal: function (S, R, ui) { return metered(ui, '2', '0V') && metered(ui, '3', '0V'); },
         done: '24 V at wire 2: STOP and OL1 are closed, so supply voltage reaches the parallel branch. 0 V at wire 3: START and the holding contact are both open. The voltage disappears across the open devices.',
         hints: ['Click test point 2, then 0V. Then click 3, then 0V.', 'The probes alternate: red first, then black.', 'Read 2→0V (24 V), then 3→0V (0 V).'] },
-      { kind: 'ask', noHint: true, title: 'No-hint check (1)', diagram: 'starter', preset: { run: true },
+      { kind: 'ask', noHint: true, title: 'No-hint check (1)', cap: 'holding', diagram: 'starter', preset: { run: true },
         q: 'The motor has been running for an hour. Nobody is touching START. Which device is completing the coil circuit around the START button?',
         choices: [
           { t: 'PB1, the STOP button', fb: 'PB1 is in series and must be closed, but it is not what bridges the open START button.' },
@@ -408,7 +410,7 @@
         ],
         run: [],
         verify: function (S, R) { return R.el['M1-AUX'].flow && !R.el.PB2.flow; } },
-      { kind: 'ask', noHint: true, title: 'No-hint check (2)', diagram: 'starter',
+      { kind: 'ask', noHint: true, title: 'No-hint check (2)', cap: 'predict', diagram: 'starter',
         q: 'Which of these would <b>not</b> interrupt the M1 coil circuit while the motor is running?',
         choices: [
           { t: 'Pressing STOP', fb: 'STOP is in series with the coil. Pressing it interrupts the circuit.' },
@@ -424,12 +426,13 @@
 
   /* ====================================================== LESSON 6 */
   L.push({
-    id: 'L6', title: 'Sensors and PLC basics', short: 'Signal chain and checkpoints', minutes: 20, station: 'conveyor',
+    id: 'L6', concept: 'diag', title: 'Sensors and PLC basics', short: 'Signal chain and checkpoints', minutes: 20, station: 'conveyor',
     steps: [
       { kind: 'say', title: 'The chain', diagram: 'plc',
         text: 'A PLC is a small industrial computer. On this conveyor the chain is:<br><br><b>Field device → input → logic → output → interface device → load</b><br><br>Photoelectric sensor PEC1 sees a box. PLC input I0 receives the signal. The program evaluates it. Output Q0 turns on. Q0 energizes interposing relay CR2. A CR2 contact switches pilot light PL2, "BOX PRESENT".',
         hints: ['Read the numbered labels 1 to 6 across the drawing.', 'Each link hands the signal to the next.', 'PEC1 → I0 → logic → Q0 → CR2 → PL2.'] },
       { kind: 'demo', title: 'A box arrives', diagram: 'plc',
+        expect: { q: 'A box is about to reach PEC1. What do you expect to happen first, and why?', choices: ['Lamp PL2 lights first, because it is the load', 'The sensor output switches first, then the input, the logic, the output, the relay and finally the lamp', 'Output Q0 turns on first, because the PLC is in charge'], ok: 1 },
         text: 'Watch the signal move along the chain.',
         script: [
           { ms: 700, set: { box: true }, note: 'Box at the sensor. PEC1 output on, input I0 on, logic true, Q0 on, CR2 pulls in, PL2 lights.' },
@@ -493,7 +496,7 @@
 
   /* ====================================================== LESSON 7 */
   L.push({
-    id: 'L7', title: 'Pneumatic and hydraulic recognition', short: 'Short module: fluid power symbols', minutes: 12, station: 'pneu',
+    id: 'L7', concept: 'sym', optional: true, title: 'Pneumatic and hydraulic recognition (optional)', short: 'Short optional module: fluid power symbols', minutes: 12, station: 'pneu',
     tabs: [['pneu', 'Pneumatic circuit'], ['sheet:fluid', 'Fluid symbols']],
     steps: [
       { kind: 'say', title: 'Air and oil', diagram: 'pneu',
@@ -540,7 +543,7 @@
           { t: 'Two possible positions of one valve, each showing its flow paths', ok: true, fb: 'Correct. Only one box is in line with the ports at a time.' },
           { t: 'The inlet side and the outlet side', fb: 'The ports are the numbered lines. The boxes are positions.' }
         ] },
-      { kind: 'ask', noHint: true, title: 'No-hint check (2)', diagram: 'pneu',
+      { kind: 'ask', noHint: true, title: 'No-hint check (2)', concept: 'safe', diagram: 'pneu',
         q: 'The machine\'s electrical supply has been switched off. Is the pneumatic cylinder now safe to reach into?',
         choices: [
           { t: 'Yes, nothing can move without electricity', fb: 'Air pressure, springs and gravity do not need electricity. A spring-return valve can even cause movement when power is removed.' },
@@ -549,10 +552,79 @@
     ]
   });
 
+  /* ====================================================== LESSON: DRAWING SET */
+  L.push({
+    id: 'LD', concept: 'nav', title: 'Navigating a drawing set', short: 'Sheets, revisions, tags, cross-references', minutes: 15, station: 'panel',
+    tabs: [['dwg1', '1 · Device list'], ['dwg2', '2 · Power'], ['dwg3', '3 · Control'], ['dwg4', '4 · Terminals']],
+    steps: [
+      { kind: 'say', title: 'A drawing set, not a single page', diagram: 'dwg1',
+        text: 'On the floor nobody hands you one tidy picture. You get a <b>drawing set</b>. This is a small one for the conveyor starter you already know: four sheets.<br><br>Look at the box in the corner: the <b>title block</b>. It tells you the drawing number (TS-100), the <b>sheet title</b>, <b>sheet 1 of 4</b> and the <b>revision</b>, B. Read it before anything else so you know what you are holding and whether it is current.',
+        hints: ['The title block is the ruled box at the bottom right.', 'Sheet title, sheet number and revision are in its cells.', 'TS-100, sheet 1 of 4, revision B.'] },
+      { kind: 'say', title: 'Device tags', diagram: 'dwg1',
+        text: 'Sheet 1 is the <b>device list</b>. Every device has a <b>reference tag</b>: PB1, M1, OL1. The same tag marks that device on every sheet and on a label in the panel.<br><br>The list also says which sheets show the device and where it is mounted. Select a row: the device highlights on the equipment.',
+        safety: 'These tags and numbers are the convention of this training set. Other sites use other tags. Read the legend of the set in front of you.',
+        hints: ['Each row is one device.', 'The third column lists the sheets that show it.', 'Click the M1 row and look at the equipment view.'] },
+      { kind: 'find', title: 'Your turn: find a tag', diagram: 'dwg1', cap: 'locate',
+        q: 'On sheet 1, select the row for the <b>overload relay</b>.', parts: ['L_OL1'],
+        fbOk: 'Yes: OL1. The list says it appears on sheets 2, 3 and 4 and sits under M1.', fbNo: 'Not that row. Read the Device column for "overload relay".',
+        hints: ['Read down the Device column.', 'Overload relays are usually tagged OL.', 'Select the row tagged OL1.'] },
+      { kind: 'ask', title: 'Predict: one device, three sheets', diagram: 'dwg1',
+        q: 'The device list says M1 is shown on sheets 2, 3 and 4. Why would one device appear on three sheets?',
+        choices: [
+          { t: 'There are three contactors called M1', fb: 'A tag identifies one device. It appears on several sheets because its parts do different jobs.' },
+          { t: 'Its main contacts are in the power circuit, its coil and auxiliary contact are in the control circuit, and its terminals are on the connection sheet', ok: true, fb: 'Right. One device, drawn wherever each of its parts is used.' },
+          { t: 'It is a drawing error', fb: 'It is normal. Each part of a device is drawn in the circuit it belongs to.' } ],
+        hints: ['Think about what is inside a contactor.', 'Coil, main contacts and auxiliary contact do different jobs.', 'Different parts of M1 belong on different sheets.'] },
+      { kind: 'say', title: 'Sheet 3: identifiers and cross-references', diagram: 'dwg3',
+        text: 'Sheet 3 is the control circuit, the rung from Lesson 5 with more detail:<br>• <b>Terminal identifiers</b> at each device: 11-12 on STOP, 13-14 on START and on the M1 auxiliary contact, A1-A2 on the coil.<br>• <b>Wire identifiers</b> in the squares: 1, 2, 3.<br>• A <b>cross-reference</b> beside coil M1: its 13-14 contact is on this sheet, its main contacts are on sheet 2.<br><br>Terminal numbers repeat between devices, so always say tag and terminal together: <b>M1:13</b>, <b>PB2:13</b>.',
+        sel: 'M1coil',
+        hints: ['Look at the small numbers at the ends of each symbol.', 'The italic note under the coil is the cross-reference.', 'Tag + terminal identifies one point.'] },
+      { kind: 'find', title: 'Your turn: follow a cross-reference', diagram: 'dwg3', cap: 'locate', concept: 'coil',
+        q: 'The note beside coil M1 says its 13-14 contact is on this sheet. Select that contact.', parts: ['M1aux'],
+        fbOk: 'Yes. Same tag, M1, with terminals 13-14: the auxiliary (holding) contact.', fbNo: 'Not that one. Look for a contact that carries the tag M1 and the terminals 13-14.',
+        hints: ['It carries the same tag as the coil.', 'It is on the branch under START.', 'Select the contact labelled M1, 13-14.'] },
+      { kind: 'try', title: 'Your turn: change sheets', diagram: 'dwg3',
+        text: 'Now follow the other half of the cross-reference. Use the tabs to open <b>sheet 2</b> and select one of the <b>M1 main contacts</b>.',
+        goal: function (S, R, ui) { return ui.diagram === 'dwg2' && /^M1m/.test(ui.selPart || ''); },
+        done: 'There they are, in the power circuit, with a note pointing back to the coil on sheet 3. That is how you move through a drawing set: tag, cross-reference, sheet.',
+        hints: ['Tabs are above the drawing.', 'Sheet 2 is the motor power circuit.', 'Open "2 · Power" and click a contact under the heading M1.'] },
+      { kind: 'say', title: 'Sheet 4: terminal connections', diagram: 'dwg4',
+        text: 'Sheet 4 shows terminal strip <b>TB1</b>. Each row is one terminal: on the left, the panel terminals that land there; on the right, the door or field device.<br><br>Row 3 reads: wire <b>2</b> joins <b>OL1:96</b> and <b>M1:13</b>, lands on <b>TB1-3</b>, and carries on to <b>PB2:13</b>, the START button. This is the sheet for finding where a wire physically goes.',
+        hints: ['One row, one terminal.', 'The wire number is printed above each line.', 'Left = inside the panel, right = door and field.'] },
+      { kind: 'find', title: 'Your turn: find a terminal', diagram: 'dwg4', cap: 'locate',
+        q: 'Wire <b>1</b> comes back from the STOP button. Select the TB1 terminal it lands on.', parts: ['TB1:2'],
+        fbOk: 'Yes, TB1 terminal 2. From there wire 1 continues to OL1:95.', fbNo: 'Not that terminal. Find the row whose wire number is 1.',
+        hints: ['Read the WIRE column.', 'Wire 1 appears on one row only.', 'Select the TB1 box numbered 2.'] },
+      { kind: 'ask', title: 'Predict: two revisions', diagram: 'dwg1',
+        q: 'The copy in the panel pocket is Rev A. The one you were handed is Rev B, which adds sensor PEC1. Which do you work from?',
+        choices: [
+          { t: 'Rev A, because it lives in the panel', fb: 'A drawing in the panel can be out of date. Rev A does not show the sensor wiring at all.' },
+          { t: 'The latest issued revision, Rev B, after confirming it is the current one', ok: true, fb: 'Right. And if the panel does not match the current drawing, that is something to report, not to guess around.' },
+          { t: 'Either: revisions only change the title block', fb: 'Revisions record real changes. Sheet 1 says Rev B added PEC1 and TB1 terminals 6 to 8.' } ],
+        hints: ['Read the revision table on sheet 1.', 'A later letter replaces earlier issues.', 'Rev B, once confirmed current.'] },
+      { kind: 'ask', noHint: true, title: 'No-hint check (1)', diagram: 'dwg1',
+        q: 'You are at the panel looking at the wire on TB1 terminal 4. Which sheet tells you which door device its other end goes to?',
+        choices: [
+          { t: 'Sheet 2, motor power circuit', fb: 'Sheet 2 shows the three-phase circuit. TB1-4 is a control terminal.' },
+          { t: 'Sheet 3, control circuit', fb: 'Sheet 3 shows how the circuit works, but not which terminal each wire lands on.' },
+          { t: 'Sheet 4, terminal connections', ok: true, fb: 'Correct. Row 4: wire 3, from M1:14 and M1:A1 to PB2:14.' } ] },
+      { kind: 'ask', noHint: true, title: 'No-hint check (2)', diagram: 'dwg1',
+        q: 'The motor will not start and you want to understand what has to happen for the contactor to pull in. Which sheet do you open?',
+        choices: [
+          { t: 'Sheet 3, control circuit', ok: true, fb: 'Correct. The control circuit shows every device that must conduct to energize coil M1.' },
+          { t: 'Sheet 4, terminal connections', fb: 'Useful later for finding a terminal, but it does not show the logic.' },
+          { t: 'Sheet 1, device list', fb: 'Good for looking up a tag, not for understanding the sequence.' } ] }
+    ]
+  });
+  L.push({ id: 'LP', concept: 'nav', title: 'Drawing-to-panel challenge', short: 'Find it on the panel from the drawing', minutes: 15, station: 'panel', kind: 'panel', steps: [] });
+
   /* ====================================================== LESSONS 8 and 9 (special screens) */
   L.push({ id: 'L8', title: 'Troubleshooting story missions', short: 'Eight fault scenarios', minutes: 40, station: 'overview', kind: 'missions', steps: [] });
   L.push({ id: 'L9', title: 'Mock hands-on interview', short: '20-question assessment', minutes: 25, station: 'overview', kind: 'quiz', steps: [] });
 
+  /* Core order: schematics, matching, START/STOP, drawing-to-panel, troubleshooting, interview; fluid power last. */
+  var ORDER = ['L1', 'L2', 'L3', 'L4', 'L5', 'LD', 'LP', 'L6', 'L8', 'L9', 'L7'];
+  L.sort(function (a, b) { return ORDER.indexOf(a.id) - ORDER.indexOf(b.id); });
   FS.lessons = L;
   FS.lesson = function (id) { return L.filter(function (l) { return l.id === id; })[0]; };
   FS.HONEST = HONEST;
@@ -573,9 +645,10 @@
   FS.paths = [
     { id: 'p30', name: '30-minute emergency review', minutes: 30, blurb: 'The night before or the morning of. Only what is most likely to be asked.',
       items: [
-        { l: 'L5', m: 10, note: 'START/STOP circuit: do the demo, the three predictions and the four explanations.' },
-        { l: 'L3', m: 6, note: 'Workbench: NO versus NC, coil and contacts, overload, the earth/common/neutral card.' },
-        { l: 'L8', m: 8, note: 'Missions 3 and 5 only: practice saying the eight steps.' },
+        { l: 'L5', m: 9, note: 'START/STOP circuit: do the demo, the three predictions and the four explanations.' },
+        { l: 'L3', m: 5, note: 'Workbench: NO versus NC, coil and contacts, overload, the earth/common/neutral card.' },
+        { l: 'LP', m: 4, note: 'Drawing-to-panel: the first five tasks.' },
+        { l: 'L8', m: 6, note: 'Two "motor will not start" cases: practice saying the eight steps.' },
         { l: 'review', m: 6, note: 'Before the Interview sheet: say the five explanations aloud.' } ] },
     { id: 'p120', name: '2-hour essentials', minutes: 120, blurb: 'Electrical essentials end to end, then a quick look at fluid power.',
       items: [
@@ -584,10 +657,11 @@
         { l: 'L3', m: 22, note: 'All core symbols.' },
         { l: 'L4', m: 15, note: 'Series, parallel, tracing.' },
         { brk: true, m: 5, note: 'Stand up, drink water.' },
-        { l: 'L5', m: 20, note: 'The key circuit. Do every step.' },
-        { l: 'L8', m: 20, note: 'Missions 1, 3, 4, 5, 6.' },
-        { l: 'L6', m: 8, note: 'The signal chain and checkpoints.' },
-        { l: 'L7', m: 5, note: 'Valve boxes and stored energy only.' },
+        { l: 'L5', m: 18, note: 'The key circuit. Do every step.' },
+        { l: 'LD', m: 8, note: 'Sheets, tags, cross-references.' },
+        { l: 'LP', m: 8, note: 'Find devices and terminals on the panel.' },
+        { l: 'L8', m: 18, note: 'The five "motor will not start" cases.' },
+        { l: 'L6', m: 6, note: 'The signal chain and checkpoints.' },
         { l: 'review', m: 5, note: 'Read once, aloud.' } ] },
     { id: 'p240', name: '4-hour guided preparation', minutes: 240, blurb: 'Everything, in teaching order, with breaks. Finish with the mock interview.',
       items: [
@@ -598,11 +672,13 @@
         { l: 'L4', m: 25, note: 'Ladder reading and path tracing.' },
         { l: 'L5', m: 30, note: 'START/STOP. Repeat the predictions until they are automatic.' },
         { brk: true, m: 10, note: 'Break. Say the four "why" explanations from memory.' },
-        { l: 'L6', m: 20, note: 'Sensors and PLC basics.' },
-        { l: 'L8', m: 40, note: 'All eight missions.' },
+        { l: 'LD', m: 12, note: 'The four-sheet drawing set.' },
+        { l: 'LP', m: 12, note: 'Drawing-to-panel challenge, all ten tasks.' },
+        { l: 'L6', m: 15, note: 'Sensors and PLC basics.' },
+        { l: 'L8', m: 40, note: 'All ten missions, with the evidence notebook.' },
         { brk: true, m: 10, note: 'Break.' },
-        { l: 'L7', m: 12, note: 'Fluid power recognition.' },
         { l: 'L9', m: 22, note: 'Mock interview. Repeat any lesson it recommends.' },
+        { l: 'L7', m: 8, note: 'Optional: fluid power recognition.' },
         { l: 'review', m: 6, note: 'Before the Interview sheet. Print it if you can.' } ] }
   ];
 

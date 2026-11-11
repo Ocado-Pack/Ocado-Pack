@@ -27,7 +27,9 @@
     '.schem-svg .flowdash.rev{animation-direction:reverse}',
     '.schem-svg.rm .flowdash{animation:none}',
     '@keyframes fsflow{to{stroke-dashoffset:-12}}',
+    '.schem-svg .pot{fill:none;stroke:var(--pot);stroke-width:12;stroke-linecap:round;stroke-linejoin:round}',
     '.schem-svg .dot{fill:var(--ink)}',
+    '.schem-svg .tblock text{fill:var(--ink)}',
     '.schem-svg .part{cursor:pointer;outline:none}',
     '.schem-svg .part .hit{fill:transparent;stroke:transparent;stroke-width:2}',
     '.schem-svg .part:hover .hit{stroke:var(--idle);stroke-dasharray:3 3}',
@@ -96,8 +98,41 @@
     W2: function () { return ''; },
     PB1: function (s) { return s.pb.PB1 ? 'PRESSED' : 'RELEASED'; },
     'M1-AUX': function () { return ''; },
-    OL1: function () { return ''; }
+    OL1: function () { return ''; },
+    PB2: function (s) { return s.pb.PB2 ? 'PRESSED' : 'RELEASED'; },
+    S1: function (s) { return s.sw.S1 ? 'SWITCHED ON' : 'SWITCHED OFF'; },
+    SS2: function (s) { return s.sw.SS2 ? 'AT EXTEND' : 'AT RETRACT'; }
   };
+  /* Which circuit node each drawn wire belongs to, inferred once from the device terminals it touches. */
+  function onSeg(q, a, b) {
+    if (a[0] === b[0]) return q[0] === a[0] && q[1] >= Math.min(a[1], b[1]) && q[1] <= Math.max(a[1], b[1]);
+    if (a[1] === b[1]) return q[1] === a[1] && q[0] >= Math.min(a[0], b[0]) && q[0] <= Math.max(a[0], b[0]);
+    return false;
+  }
+  function onWire(q, w) { for (var i = 0; i < w.pts.length - 1; i++) if (onSeg(q, w.pts[i], w.pts[i + 1])) return true; return false; }
+  function wireNodes(d) {
+    if (d._wn) return d._wn;
+    var els = {}, seeds = [], W = d.wires || [], par = W.map(function (w, i) { return i; }), node = {};
+    ((FS.sim.CIRCUITS[d.circuit] || {}).els || []).forEach(function (e) { els[e[0]] = e; });
+    (d.parts || []).forEach(function (p) {
+      var e = p.el && els[p.el]; if (!e || p.custom || p.sym === 'box') return;
+      if (p.sym === 'sensor3') seeds.push([p.x + 34, p.y, e[2]]);
+      else if (p.rot) { seeds.push([p.x, p.y - 30, e[1]]); seeds.push([p.x, p.y + 30, e[2]]); }
+      else { seeds.push([p.x - 30, p.y, e[1]]); seeds.push([p.x + 30, p.y, e[2]]); }
+    });
+    function find(i) { while (par[i] !== i) i = par[i]; return i; }
+    function elec(w) { return !/pwr|fluid|pe/.test(w.cls || ''); }
+    W.forEach(function (a, i) {
+      if (!elec(a)) return;
+      W.forEach(function (b, j) {
+        if (j <= i || !elec(b)) return;
+        var touch = [a.pts[0], a.pts[a.pts.length - 1]].some(function (q) { return onWire(q, b); }) || [b.pts[0], b.pts[b.pts.length - 1]].some(function (q) { return onWire(q, a); });
+        if (touch) par[find(i)] = find(j);
+      });
+    });
+    W.forEach(function (w, i) { if (elec(w)) seeds.forEach(function (sd) { if (onWire(sd, w)) node[find(i)] = sd[2]; }); });
+    return (d._wn = W.map(function (w, i) { return elec(w) ? (node[find(i)] || null) : null; }));
+  }
   function boxOf(p, st) {
     var w, h;
     if (p.hit || p.sym === 'box') {
@@ -111,23 +146,24 @@
   }
 
   function stateOf(p, c) {
-    if (p.noSt) return '';
+    if (p.noSt || c.labels === false || (c.layers && !c.layers.st)) return '';
     if (!c.reveal && c.hideFaults && p.el && OBSERVED[p.el]) return OBSERVED[p.el](c.S);
     if (p.el === 'F1' && !c.S.fuseIn) return 'REMOVED';
     if (p.st) return p.st(c);
     if (p.plain || !p.el) return '';
     var e = c.el(p.el);
     if (p.stw) return e.closed ? p.stw[0] : p.stw[1];
-    if (FS.sim.DEV[p.el].load) return e.on ? 'ON' : 'OFF';
-    return e.closed ? 'CLOSED' : 'OPEN';
+    if (FS.sim.DEV[p.el].load) return FS.sim.DEV[p.el].relay ? (e.on ? 'ENERGIZED' : 'DE-ENERGIZED') : (e.on ? 'ON' : 'OFF');
+    return e.closed ? '● CLOSED' : '○ OPEN';
   }
 
   function drawPart(p, d, c) {
     var e = p.el ? c.el(p.el) : null;
-    var live = p.live ? !!c.flags[p.live] : !!(e && e.flow);
-    var on = !!(e && e.on);
+    var showCur = !c.layers || c.layers.cur;
+    var live = showCur && (p.live ? !!c.flags[p.live] : !!(e && e.flow));
+    var on = !!(e && e.on) && (!c.layers || c.layers.st);
     var sel = c.selPart === p.id;
-    var link = !sel && c.selRef && c.selRef === p.ref;
+    var link = !sel && c.link !== false && c.selRef && c.selRef === p.ref;
     var fault = c.reveal && (d.faults || []).some(function (f) { return f.part === p.id && c.S.faults[f.key]; });
     var removed = p.el === 'F1' && !c.S.fuseIn;
     var traced = c.trace && p.el && c.trace.indexOf(p.el) >= 0;
@@ -141,11 +177,11 @@
     var hot = (live || on) ? ' hot' : '';
     if (p.rot) {
       if (!p.noRef) s += '<text class="ref" style="text-anchor:start" x="' + (p.x + 22) + '" y="' + (p.y - 8) + '">' + esc(p.ref) + '</text>';
-      if (p.sub) s += '<text class="sub" style="text-anchor:start" x="' + (p.x + 22) + '" y="' + (p.y + 4) + '">' + esc(p.sub) + '</text>';
+      if (p.sub && c.labels !== false) s += '<text class="sub" style="text-anchor:start" x="' + (p.x + 22) + '" y="' + (p.y + 4) + '">' + esc(p.sub) + '</text>';
       if (st) s += '<text class="st' + hot + '" style="text-anchor:start" x="' + (p.x + 22) + '" y="' + (p.y + 16) + '">' + esc(st) + '</text>';
     } else {
       if (!p.noRef) s += '<text class="ref" x="' + p.x + '" y="' + (p.y - 24) + '">' + esc(p.ref) + '</text>';
-      if (p.sub && !p.plain) s += '<text class="sub" x="' + p.x + '" y="' + (p.y + 27) + '">' + esc(p.sub) + '</text>';
+      if (p.sub && !p.plain && c.labels !== false) s += '<text class="sub" x="' + p.x + '" y="' + (p.y + 27) + '">' + esc(p.sub) + '</text>';
       if (st) s += '<text class="st' + hot + '" x="' + (p.x + (p.sx || 0)) + '" y="' + (p.y + (p.sy != null ? p.sy : (p.sub && !p.plain ? 38 : 28))) + '">' + esc(st) + '</text>';
     }
     if ((sel || link) && (!p.plain || p.tag)) s += '<text class="seltag" x="' + (bx[0] + bx[2] / 2) + '" y="' + (bx[1] - 4) + '">' + (sel ? 'SELECTED' : 'SAME DEVICE') + '</text>';
@@ -164,12 +200,16 @@
   function render(d, c) {
     c.el = function (id) { return (c.res && c.res.el[id]) || { closed: false, flow: false, on: false }; };
     c.flags = c.flags || {};
-    var vb = d.vb, out = [];
+    var vb = c.vb || d.vb, out = [], wn = wireNodes(d), showCur = !c.layers || c.layers.cur, showPot = c.layers && c.layers.pot && c.res && c.res.tied;
     out.push('<svg class="schem-svg' + (c.rm ? ' rm' : '') + '" xmlns="http://www.w3.org/2000/svg" viewBox="' + vb.join(' ') + '" role="group" aria-label="' + esc(d.title) + '">');
     if (c.embedCss) out.push('<style>' + c.embedCss + '</style>');
     out.push('<rect class="paper" x="' + vb[0] + '" y="' + vb[1] + '" width="' + vb[2] + '" height="' + vb[3] + '"/>');
+    if (showPot) (d.wires || []).forEach(function (w, i) {
+      var n = wn[i];
+      if (n && c.res.tied[n] && c.res.V[n] > 0.8 * FS.sim.VS) out.push('<polyline class="pot" points="' + pts(w.pts) + '"/>');
+    });
     (d.wires || []).forEach(function (w) {
-      var live = w.live ? !!c.flags[w.live] : w.els.some(function (id) { return c.el(id).flow; });
+      var live = showCur && (w.live ? !!c.flags[w.live] : w.els.some(function (id) { return c.el(id).flow; }));
       out.push('<polyline class="w ' + (w.cls || '') + (live ? ' live' : '') + '" points="' + pts(w.pts) + '"/>');
       if (live) out.push('<polyline class="flowdash' + (w.rev ? ' rev' : '') + '" points="' + pts(w.pts) + '"/>');
     });
@@ -192,9 +232,9 @@
   function standalone(d, c, vars) {
     var css = CSS.replace(/var\((--[a-z0-9]+)\)/g, function (m, name) { return vars[name] || '#888'; });
     var cc = {}; for (var k in c) cc[k] = c[k];
-    cc.embedCss = css; cc.rm = true; cc.showTps = false; cc.selPart = null; cc.selRef = null; cc.trace = null;
+    cc.embedCss = css; cc.rm = true; cc.showTps = false; cc.selPart = null; cc.selRef = null; cc.trace = null; cc.vb = null;
     return render(d, cc);
   }
 
-  FS.schem = { CSS: CSS, render: render, standalone: standalone, esc: esc };
+  FS.schem = { CSS: CSS, render: render, standalone: standalone, esc: esc, wireNodes: wireNodes };
 })(typeof window !== 'undefined' ? window : globalThis);

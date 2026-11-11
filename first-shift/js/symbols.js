@@ -93,6 +93,7 @@
       return '<rect class="sy syw" x="' + (-w / 2) + '" y="' + (-h / 2) + '" width="' + w + '" height="' + h + '" rx="3"/>' +
         t(0, o.t2 ? -2 : 4, o.t || '', 'syt') + (o.t2 ? t(0, 12, o.t2, 'syt sm') : '');
     },
+    row: function () { return ''; },
     /* ---- optional recognition ---- */
     res: function () { return p('M-30 0H-18 l3 -7 l6 14 l6 -14 l6 14 l6 -14 l6 14 l3 -7 H30'); },
     cap: function () { return p('M-30 0H-4 M-4 -11V11 M30 0H6 M10 -11 Q1 0 10 11'); },

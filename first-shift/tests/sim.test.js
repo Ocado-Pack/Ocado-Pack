@@ -4,7 +4,7 @@
 var assert = require('assert');
 var path = require('path');
 var base = path.join(__dirname, '..', 'js');
-['sim.js', 'symbols.js', 'diagrams.js', 'schematic.js', 'data/components.js', 'data/lessons.js', 'data/scenarios.js', 'data/quiz.js']
+['sim.js', 'symbols.js', 'diagrams.js', 'schematic.js', 'data/components.js', 'panel.js', 'drawings.js', 'data/lessons.js', 'data/assess.js', 'data/scenarios.js', 'data/quiz.js']
   .forEach(function (f) { require(path.join(base, f)); });
 var FS = globalThis.FS, sim = FS.sim;
 var passed = 0;
@@ -158,32 +158,93 @@ test('Quiz has 20 questions: 8 symbol, 4 circuit, 4 troubleshooting, 2 diagram, 
   var n = {}; FS.quiz.forEach(function (q) { n[q.cat] = (n[q.cat] || 0) + 1; });
   assert.deepStrictEqual(n, { symbol: 8, circuit: 4, trouble: 4, diagram: 2, safety: 2 });
 });
+console.log('Missions: one validated fault each, evidence derived from the model');
 FS.missions.forEach(function (m) {
-  test('Mission ' + m.id + ': symptom reproduces, evidence comes from the model, one supported diagnosis', function () {
-    var cid = FS.diagrams[m.diagram].circuit, s = fresh(m.preset);
-    Object.keys(m.faults).forEach(function (k) { s.faults[k] = m.faults[k]; });
-    sim.settle(cid, s);
-    m.checks.forEach(function (c) {
-      if (c.type === 'bad') assert(c.fb && !c.ev, 'bad checks explain themselves and give no evidence');
-      else assert(typeof c.ev(s) === 'string' && !/undefined|NaN/.test(c.ev(s)));
-    });
-    assert(m.checks.filter(function (c) { return c.type === 'key'; }).length >= 2);
-    ['safe', 'expected', 'section', 'interpret', 'diagnose'].forEach(function (k) {
-      assert.strictEqual(m[k].choices.filter(function (c) { return c.ok; }).length, 1, k);
-    });
-    assert(m.others.length >= 3 && m.repair && m.why);
+  test('Mission ' + m.id + ' (' + m.cause + '): evidence separates every listed cause; no diagnosis without evidence', function () {
+    var good = m.checks.filter(function (c) { return !FS.CHK[c].bad; });
+    assert(m.causes.indexOf(m.cause) >= 0 && m.causes.length >= 3);
+    m.causes.forEach(function (c) { assert(FS.CAUSES[c] && FS.CAUSES[c].t, c); });
+    good.forEach(function (c) { var r = FS.mread(m, c); assert(typeof r.text === 'string' && r.cat !== 'na' && !/undefined|NaN/.test(r.text), c); assert(FS.CHK[c].opts.some(function (o) { return o[0] === r.cat; }), c + ' category ' + r.cat + ' has a label'); });
+    m.checks.filter(function (c) { return FS.CHK[c].bad; }).forEach(function (c) { assert(!FS.CHK[c].read, 'unsafe or guessing actions give no evidence'); });
+    var none = FS.mruled(m, []); assert(Object.keys(none).every(function (k) { return !none[k]; }), 'nothing is ruled out before any check');
+    var all = FS.mruled(m, good); assert(Object.keys(all).every(function (k) { return all[k]; }), 'the available checks can rule out every other cause');
+    good.forEach(function (c) { assert.notStrictEqual(FS.mverdict(m, c, m.cause), 'weakens', 'no check contradicts the true cause'); });
+    ['safe', 'expected', 'section'].forEach(function (k) { assert.strictEqual(m[k].choices.filter(function (c) { return c.ok; }).length, 1, k); });
+    assert(m.why && m.repair && FS.diagrams[m.diagram].circuit);
   });
 });
-test('Mission evidence matches the fault (spot checks)', function () {
-  function ev(id, cid) { var m = FS.mission(id), s = fresh(m.preset); Object.keys(m.faults).forEach(function (k) { s.faults[k] = true; }); sim.settle(FS.diagrams[m.diagram].circuit, s); return m.checks.find(function (c) { return c.id === cid; }).ev(s); }
-  assert(/^0\.0 V/.test(ev('M1', 'b')) && /OL/.test(ev('M1', 'd')));
-  assert(/^24\.0 V/.test(ev('M2', 'c')) && /^0\.0 V/.test(ev('M2', 'd')));
-  assert(/^0\.0 V/.test(ev('M3', 'b')) && /OL/.test(ev('M3', 'd')));
-  assert(/^24\.0 V/.test(ev('M4', 'a')) && /^0\.0 V/.test(ev('M4', 'b')) && /TRIPPED/.test(ev('M4', 'c')));
-  assert(/pulls in.*drops out/.test(ev('M5', 'a')) && /^24\.0 V/.test(ev('M5', 'b')));
-  assert(/^24\.0 V/.test(ev('M6', 'c')) && /OL/.test(ev('M6', 'd')));
-  assert(/LED is off/.test(ev('M7', 'b')) && /^0\.0 V/.test(ev('M7', 'd')));
-  assert(/indicator is on/.test(ev('M8', 'a')) && /0 bar/.test(ev('M8', 'c')));
+test('Five "motor will not start" cases share one symptom and cover supply, STOP, overload, START and coil', function () {
+  var fam = FS.missions.filter(function (m) { return m.fam === 'nostart'; });
+  assert.deepStrictEqual(fam.map(function (m) { return m.cause; }).sort(), ['coilOpen', 'noSupply', 'olTrip', 'startOpen', 'stopOpen']);
+  fam.forEach(function (m) {
+    assert.strictEqual(m.symptom, fam[0].symptom);
+    assert.strictEqual(FS.mread(m, 'm_obs').cat, 'out', m.id + ' does not start');
+  });
+  var healthy = sim.defaultState(); sim.run('starter', healthy, [{ 'pb.PB2': true }]); assert(healthy.relay.M1, 'a healthy circuit does start');
+});
+test('Support / weaken verdicts follow the model', function () {
+  var m = FS.mission('M3');   // STOP path open
+  assert.strictEqual(FS.mverdict(m, 'm_v1', 'stopOpen'), 'supports');
+  assert.strictEqual(FS.mverdict(m, 'm_v1', 'coilOpen'), 'weakens');
+  assert.strictEqual(FS.mverdict(m, 'm_obs', 'stopOpen'), 'neutral', 'every cause gives "does not pull in"');
+  assert.strictEqual(FS.mruled(m, ['m_vL']).noSupply, true);
+  assert.strictEqual(FS.mruled(m, ['m_vL']).coilOpen, false);
+});
+
+console.log('Model accuracy');
+test('A floating point is reported as not modeled, never as an invented number', function () {
+  var s = fresh({ 'pb.PB1': true }); sim.settle('starter', s);
+  var r = sim.meter('starter', s, 'V', '1', '0V'); assert(r.na && r.text === 'Not modeled' && r.value === undefined);
+  s = fresh({ fuseIn: false }); sim.settle('lamp', s); assert(sim.meter('lamp', s, 'V', '1', '0V').na);
+});
+test('Potential, current and device state are separate facts', function () {
+  var s = fresh(), r = sim.settle('starter', s);
+  assert(Math.abs(r.V['2'] - 24) < 0.01 && r.tied['2'], 'wire 2 is at supply potential with the motor stopped');
+  assert(!r.el.PB1.flow && !r.el.M1.flow, 'but no current flows anywhere in the rung');
+  assert(r.el.PB1.closed && !r.el.PB2.closed, 'and device states are known independently');
+  s = fresh({ 'faults.coilOpen': true, 'pb.PB2': true }); r = sim.settle('starter', s);
+  assert(Math.abs(r.V['3'] - 24) < 0.01 && !r.el.M1.on && !s.relay.M1, 'potential at the coil terminal alone does not operate it');
+});
+test('Missing control supply: nothing energizes and L+ reads 0 V', function () {
+  var s = fresh({ 'faults.noSupply': true, 'pb.PB2': true }); sim.settle('starter', s);
+  assert(!s.relay.M1); assert.strictEqual(sim.meter('starter', s, 'V', 'L+', '0V').value, 0);
+});
+test('Continuity warns when more than one conducting route joins the probes', function () {
+  var s = fresh({ 'sw.S1': true, 'sw.S2': true }); sim.run('ladC', s, [{ supply: false }]); sim.meter('ladC', s, 'V', 'L+', '0V');
+  assert(/More than one conducting route/.test(sim.meter('ladC', s, 'R', 'L+', '1').note));
+  s = fresh({ 'sw.S1': true }); sim.run('ladC', s, [{ supply: false }]); sim.meter('ladC', s, 'V', 'L+', '0V');
+  assert(!/More than one/.test(sim.meter('ladC', s, 'R', 'L+', '1').note));
+});
+
+console.log('Drawing set, panel and assessment data');
+test('Wiring dataset is consistent between the panel view, sheet 4 and the tasks', function () {
+  var PN = FS.panel;
+  Object.keys(PN.WIRES).forEach(function (w) { assert(PN.WIRES[w].length >= 2, 'wire ' + w); PN.WIRES[w].forEach(function (t) { assert(PN.T[t], t + ' has a position'); assert.strictEqual(PN.wireOf(t), w); }); });
+  PN.TB.forEach(function (t) { if (t.field) assert(PN.T[t.field], t.field); });
+  assert.deepStrictEqual(PN.WIRES['2'].slice().sort(), ['M1:13', 'OL1:96', 'TB1:3'], 'wire 2 matches the control schematic');
+  assert.deepStrictEqual(PN.WIRES['3'].slice().sort(), ['M1:14', 'M1:A1', 'TB1:4']);
+  PN.tasks.forEach(function (t) {
+    t.ok.forEach(function (k) { var id = k.replace(/:$/, ''); assert(PN.DEV[id] || PN.T[id], t.id + ' target ' + k); });
+    assert(FS.diagrams[t.show[0]] && (!t.show[1] || FS.diagrams[t.show[0]].parts.some(function (p) { return p.id === t.show[1]; })), t.id + ' drawing reference');
+    assert(PN.accepts(t, t.ok[0].replace(/:$/, '')), t.id + ' accepts its own answer');
+    assert(!PN.accepts(t, 'CR2:A2'), t.id + ' rejects an unrelated terminal');
+  });
+  assert(!/NaN|undefined/.test(PN.render({ wire: '0V', hide: true, names: true })));
+});
+test('Baseline has six questions, each with one right answer; every concept has different-example retests', function () {
+  assert.strictEqual(FS.baseline.length, 6);
+  FS.baseline.forEach(function (q) { assert.strictEqual(q.choices.filter(function (c) { return c.ok; }).length, 1); assert(FS.concepts[q.concept] && FS.lesson(q.lesson)); });
+  Object.keys(FS.concepts).forEach(function (c) {
+    assert(FS.retests[c].length >= 2, c); FS.retests[c].forEach(function (q) { assert.strictEqual(q.choices.filter(function (x) { return x.ok; }).length, 1); assert(q.explain); });
+    assert(FS.lesson(FS.concepts[c].lesson));
+  });
+  FS.quiz.forEach(function (q) { assert(FS.concepts[FS.quizConcept[q.id]], q.id); });
+  assert.strictEqual(FS.caps.length, 8); FS.caps.forEach(function (c) { assert(FS.lesson(c[2])); });
+});
+test('Lesson order puts the electrical core first and fluid power last', function () {
+  assert.deepStrictEqual(FS.lessons.map(function (l) { return l.id; }), ['L1', 'L2', 'L3', 'L4', 'L5', 'LD', 'LP', 'L6', 'L8', 'L9', 'L7']);
+  FS.paths.forEach(function (p) { p.items.forEach(function (it) { if (it.l && it.l !== 'review') assert(FS.lesson(it.l), it.l); }); });
+  FS.lessons.forEach(function (L) { L.steps.forEach(function (st) { if (st.kind === 'find') st.parts.forEach(function (id) { assert(FS.diagrams[st.diagram].parts.some(function (p) { return p.id === id; }), L.id + ' ' + id); }); }); });
 });
 test('Every component has all eight teaching fields, and every diagram part maps to one', function () {
   FS.components.forEach(function (c) {

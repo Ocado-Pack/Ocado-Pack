@@ -11,30 +11,60 @@
 </head>
 <body>
 <!--page-->
-<div class="app" id="app">
+<div class="app" id="app" data-tab="mentor">
   <header class="top">
     <div class="top-in">
       <div class="brand"><span class="hazard" aria-hidden="true"></span><div><strong>FIRST SHIFT</strong><span>Maintenance Interview Bootcamp</span></div></div>
       <div class="lesson-title" id="lessonTitle"></div>
+      <div class="modes" id="modes" role="group" aria-label="Level of assistance"></div>
       <nav class="top-nav" aria-label="Main">
         <button class="navbtn" id="btnLessons">Lessons</button>
         <button class="navbtn" id="btnPaths">Study path</button>
+        <button class="navbtn" id="btnReady">Progress</button>
         <button class="navbtn" id="btnReview">Before the interview</button>
+        <button class="navbtn" id="btnSound" aria-pressed="false">Sound: off</button>
         <button class="navbtn" id="btnSettings">Settings</button>
       </nav>
     </div>
   </header>
 
+  <div class="pane-tabs" id="paneTabs" role="tablist" aria-label="Panels">
+    <button role="tab" data-pane="mentor" aria-selected="true">Explanation</button>
+    <button role="tab" data-pane="schem" aria-selected="false">Schematic</button>
+    <button role="tab" data-pane="equip" aria-selected="false">Equipment</button>
+  </div>
+
   <main class="grid" id="grid">
     <section class="pane equip" aria-label="Equipment view">
-      <div class="pane-h"><h2>Equipment</h2><div class="stations" id="stations" role="group" aria-label="Go to station"></div></div>
-      <div class="view3d" id="view3d" tabindex="0" aria-label="Training room. Drag to look around, scroll to zoom, click a part to select it. Every part is also in the list below."></div>
-      <p class="view-note" id="viewNote">Drag to look around · scroll to zoom · click a part</p>
+      <div class="pane-h"><h2>Equipment</h2>
+        <div class="tabs" id="eqTabs" role="tablist" aria-label="Equipment views">
+          <button class="tab" role="tab" data-eq="3d" aria-selected="true">Training room</button>
+          <button class="tab" role="tab" data-eq="panel" aria-selected="false">Panel inspection</button>
+        </div>
+      </div>
+      <div class="cam-bar" id="camBar"></div>
+      <div class="view3d" id="view3d" tabindex="0" aria-label="Training room. Drag to orbit, scroll or use the buttons to zoom, click a part to select it. Every part is also in the list below."></div>
+      <div class="panel-view" id="panelView" hidden>
+        <div id="panelSvg" class="panel-host"></div>
+        <div id="panelTools" class="chips"></div>
+      </div>
+      <p class="view-note" id="viewNote">Drag to orbit · scroll to zoom · click a part · hold a pushbutton to press it</p>
+      <div class="chips" id="inspect" hidden></div>
       <div class="chips" id="chips"></div>
     </section>
 
     <section class="pane schem" id="schemPane" aria-label="Schematic">
-      <div class="pane-h"><h2 id="schemTitle">Schematic</h2><div class="tabs" id="tabs" role="tablist" aria-label="Drawing views"></div><button class="btn small" id="btnExpand" aria-pressed="false">Full screen</button></div>
+      <div class="pane-h"><h2 id="schemTitle">Schematic</h2><div class="tabs" id="tabs" role="tablist" aria-label="Drawing views"></div></div>
+      <div class="toolbar">
+        <div class="layers" id="layers" role="group" aria-label="What the drawing shows"></div>
+        <div class="zoom-bar" id="zoomBar" role="group" aria-label="Drawing zoom">
+          <button class="btn small" id="btnLabels" aria-pressed="false" hidden>Show labels</button>
+          <button class="btn small" data-zoom="out" aria-label="Zoom out">−</button>
+          <button class="btn small" data-zoom="fit">Fit</button>
+          <button class="btn small" data-zoom="in" aria-label="Zoom in">+</button>
+          <button class="btn small" id="btnExpand" aria-pressed="false">Full screen</button>
+        </div>
+      </div>
       <div class="convention" id="convention"></div>
       <div class="diagram" id="diagram"></div>
       <details class="legend" id="legend" open><summary>Legend for this drawing</summary><div id="legendBody"></div></details>
@@ -75,7 +105,10 @@
 <script src="js/diagrams.js"></script>
 <script src="js/schematic.js"></script>
 <script src="js/data/components.js"></script>
+<script src="js/panel.js"></script>
+<script src="js/drawings.js"></script>
 <script src="js/data/lessons.js"></script>
+<script src="js/data/assess.js"></script>
 <script src="js/data/scenarios.js"></script>
 <script src="js/data/quiz.js"></script>
 <script src="js/scene3d.js"></script>
