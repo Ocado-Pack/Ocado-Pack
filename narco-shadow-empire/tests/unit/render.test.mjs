@@ -83,6 +83,16 @@ test('dynamic resolution: settles near the scale that holds the target and does 
   assert.ok(ctl.changes - changesAt120 <= 8, `few changes once settled: ${ctl.changes - changesAt120} in 3 minutes`);
 });
 
+test('dynamic resolution: a raise that costs the frame rate is retried less and less often', () => {
+  // ideal 0.60: one step up (0.65) drops to 85 % of the target, so every attempt has to be undone
+  const ctl = createDynamicScale({ targetFps: 60 });
+  let late = [], changesAt120 = 0;
+  simulate(ctl, 0.6, 300, (t, fps) => { if (t > 120) late.push(fps); else changesAt120 = ctl.changes; });
+  assert.ok(ctl.changes - changesAt120 <= 8, `${ctl.changes - changesAt120} changes in the last 3 minutes`);
+  assert.ok(late.filter((f) => f >= 54).length / late.length > 0.97, 'on target nearly all the time');
+  assert.ok(ctl.scale >= 0.55 && ctl.scale <= 0.65);
+});
+
 test('dynamic resolution: recovers when the load drops, respects its range, ignores hitches', () => {
   const ctl = createDynamicScale({ targetFps: 60, min: 0.5, max: 1 });
   simulate(ctl, 0.3, 30);
@@ -181,3 +191,12 @@ test('sky model: weather behaves like weather', () => {
 });
 
 function pick(b) { return [b.bufferW, b.bufferH, b.pixelRatio]; }
+
+test('self-test: still runs in Node (no renderer) and passes its learning checks', async () => {
+  const { runSelfTest } = await import('../../src/game/selftest.js');
+  const r = runSelfTest();
+  assert.equal(r.pass, true, JSON.stringify(r.results.filter((x) => !x.ok)));
+  assert.equal(r.total, 8);
+  // a context without a renderer adds no renderer checks and does not throw
+  assert.equal(runSelfTest({ has: () => false }).total, 8);
+});

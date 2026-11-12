@@ -1,6 +1,7 @@
 // Live self-test: window.__game.selfTest() -> {pass, passed, total, results: [{name, ok, detail}]}.
 // It runs the learning systems in a sandbox (own in-memory storage, own clock), so the player's saved profile is
 // never touched. Each system that lands adds its checks here. No DOM, no three.js: also runs in Node.
+// With a context that has a renderer (the browser), the rendering core is checked too - read-only, through its API.
 import { createEvents } from '../core/events.js';
 import { createStorage } from '../core/storage.js';
 import { createMath } from '../math/engine.js';
@@ -19,7 +20,8 @@ function sandbox() {
   return sb;
 }
 
-export function runSelfTest() {
+/** @param {object} [ctx] the game context; without it (Node) only the learning checks run */
+export function runSelfTest(ctx) {
   const results = [];
   const same = (got, want, what) => { if (JSON.stringify(got) !== JSON.stringify(want)) throw new Error(`${what}: expected ${JSON.stringify(want)}, got ${JSON.stringify(got)}`); };
   const check = (name, fn) => { try { fn(); results.push({ name, ok: true, detail: '' }); } catch (e) { results.push({ name, ok: false, detail: String((e && e.message) || e) }); } };
@@ -77,6 +79,27 @@ export function runSelfTest() {
     const again = createLearning(sandboxFrom(sb), { now: () => clock }).profile;
     same([again.xp, again.missionCount, again.overall().answered], [225, 1, 3], 'reloaded profile');
   });
+
+  if (ctx && typeof ctx.has === 'function' && ctx.has('gfx') && !ctx.gfx.unavailable) {
+    check('renderer: the reported drawing buffer is the real one and "4K" is only claimed for 3840 x 2160 or more', () => {
+      const i = ctx.gfx.getInfo(), c = ctx.gfx.canvas;
+      same([i.bufferW, i.bufferH], [c.width, c.height], 'buffer');
+      if (!(i.bufferW > 0 && i.bufferH > 0)) throw new Error('empty drawing buffer');
+      same(i.is4K, i.bufferW >= 3840 && i.bufferH >= 2160, 'is4K');
+    });
+    check('renderer: draws a frame that is not blank', () => {
+      const before = ctx.gfx.getInfo().frames, s = ctx.gfx.sample(6);
+      if (!s || ctx.gfx.getInfo().frames !== before + 1) throw new Error('no frame was drawn');
+      if (!(s.max - s.min > 0.01)) throw new Error(`flat image (luma ${s.min.toFixed(3)} to ${s.max.toFixed(3)})`);
+    });
+    if (ctx.has('env')) check('environment: light, fog and weather follow the clock and night is never pitch black', () => {
+      const e = ctx.env, st = e.state, ambient = st.hemiIntensity * (0.2126 * st.hemiSky[0] + 0.7152 * st.hemiSky[1] + 0.0722 * st.hemiSky[2]);
+      if (!(e.hour >= 0 && e.hour < 24) || e.isNight !== (e.hour >= 19 || e.hour < 6)) throw new Error('clock: ' + e.hour);
+      if (!(ambient >= 0.2)) throw new Error('ambient light too low: ' + ambient);
+      if (ctx.gfx.scene.fog !== e.fog || !(e.fog.density > 0)) throw new Error('fog not installed');
+      if (ctx.has('weather')) { ctx.weather.update(0); same(ctx.weather.stats().streaks > 0, e.rain > 0.02, 'rain is drawn exactly when it rains'); }
+    });
+  }
 
   const passed = results.filter((r) => r.ok).length;
   return { pass: passed === results.length, passed, total: results.length, results };

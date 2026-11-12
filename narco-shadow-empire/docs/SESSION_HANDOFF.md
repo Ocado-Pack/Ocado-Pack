@@ -1,11 +1,13 @@
 # SESSION HANDOFF — NARCO: SHADOW EMPIRE (Operation Numbers)
 
-Snapshot: 2026-11-12, end of session 2 (context guard added) · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
+Snapshot: 2026-11-12, end of session 3 (rendering core) · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
 (all paths below are relative to it). Read with `docs/NEXT_TASKS.md` and `docs/ARCHITECTURE.md`.
 
-> **Honest one-line status:** the learning core is built and verified (question engine for 4 of 20 topics, learner
-> profile, tutor hint ladder, session report — 28 unit tests, 2 browser scenarios, both demo problems give 40 and
-> x = 9); **no 3D, gameplay or UI code exists yet**. The game is not playable: the page only boots the learning core.
+> **Honest one-line status:** the learning core (question engine for 4 of 20 topics, learner profile, tutor hint ladder,
+> session report) and the **rendering core** (renderer with honest 4K modes, post chain, sky / time of day / fog, rain
+> and particles) are built and verified — 41 unit tests, 3 browser scenarios, self-test 11/11. **There is still no world,
+> no character control, no vehicle, no UI and no mission.** The game is not playable: the page boots both cores and
+> shows a status line; the 3D can only be seen in the harness `dev/render.html` on a test set of boxes.
 
 ---
 
@@ -107,7 +109,7 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | System | Status | Files |
 |---|---|---|
 | Dev server, screenshot/E2E harness | **Done, verified** (page loads, WebGL2 via SwiftShader ~5 FPS) | `tools/serve.mjs`, `tools/lib/harness.cjs`, `tools/shot.cjs`, `tools/e2e.cjs` |
-| Single-file bundler | **Done, verified** with the learning core (120 KB, loads from `file://`, zero requests) | `tools/build.mjs`, `dist/narco-shadow-empire.html` (learning core only) |
+| Single-file bundler | **Done, verified** with both cores (664 KB incl. three.js, loads from `file://`, zero requests, self-test 11/11 inside the bundle) | `tools/build.mjs`, `dist/narco-shadow-empire.html` |
 | Core: context, events, rng, storage (memory fallback), settings + quality presets, i18n, flow, loop, util, ltext, params | **Done, verified** — 7/7 unit tests pass | `src/core/*.js`, `tests/unit/core.test.mjs` |
 | District layout + anchors/stations | **Done, verified** by tests (anchors inside their rooms) | `src/world/layout.js` |
 | Contracts document | **Done** | `docs/ARCHITECTURE.md` |
@@ -118,10 +120,14 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | Learner model rules: credit / XP / mastery, adaptive levels, spaced repetition | **Done, verified** | `src/learning/{mastery,adaptive,srs}.js` |
 | Learner model: persistent profile, tutor hint ladder + follow-up gate, session director + after-action report | **Done, verified** (injected clock, real engine, throwing storage) | `src/learning/{profile,tutor,session,index}.js`, `tests/unit/learning.test.mjs` |
 | Learner model: exam logic, explain-it coach | **Not implemented** (P1; `ctx.exam` is a null object) | planned `src/learning/{exam,explain}.js` |
-| Live self-test (learning core only, sandboxed) | **Done, verified** in Node and in the browser — 8/8 | `src/game/selftest.js` → `window.__game.selfTest()` |
+| Live self-test | **Done, verified** — 8 learning checks (sandboxed; also pass in Node) + 3 rendering checks when a renderer exists: 11/11 in the browser, dev page and single-file build | `src/game/selftest.js` → `window.__game.selfTest()` |
 | Browser proof of the learning core | **Done, verified** — dev page and single-file build from `file://`: self-test, both demo problems through `ctx.tutor`, progress survives a reload, 0 console errors, 0 external requests | `tests/e2e/{_learning,learning.e2e,learning-dist.e2e}.cjs` |
 | Character model | **Stub only** (capsule with the final interface) | `src/world/character.js` |
-| Renderer / post / 4K resolution modes, sky, day-night, fog, rain, materials, lights | **Not implemented** | planned `src/world/{renderer,post,environment,weather,textures,materials,lights}.js` |
+| Renderer `ctx.gfx`: resolution modes native / fixed 4K / dynamic with an honest `getInfo()`, post chain (HDR target, MSAA, bloom, optional GTAO, one grade + tone-map + output pass) and a direct path for the low preset, live settings, context-loss recovery, no-WebGL message | **Done, verified** in the browser: both paths, every preset, a real 3840×2160 drawing buffer on both paths, portrait window not labelled 4K, loss + restore, resize. **Not verified:** frame rate on a real GPU (only software WebGL here); AO was only checked to render without artefacts | `src/world/{renderer,post,resolution}.js` |
+| Sky + time of day `ctx.env`: shader dome (gradient, clouds, sun, moon, stars, city glow), key light with texel-snapped shadows, hemisphere light, fog, exposure, bloom level, six weathers with transitions, wetness, lightning, reflection map | **Done, verified** — pure model unit-tested for every hour × weather; 20 screenshots looked at (night rain, storm flash, clear night sky, dawn fog, overcast and clear noon, morning shadows, dusk, sunset) | `src/world/{environment,skymodel}.js` |
+| Weather `ctx.weather`: 9000-streak GPU rain, ground splashes, pooled steam / smoke / dust / spray emitters, all lit by nearby lamps | **Done, verified** (counts follow the preset, smooth under gusts, emitters start/stop). **Gaps:** rain is not blocked by roofs (it only fades out by `ctx.zones.indoor`, which does not exist yet); dust and spray emitters run but were not looked at | `src/world/weather.js` |
+| Rendering harness + screenshot matrix | **Done** | `dev/render.html`, `dev/render.shots.cjs`, `tests/e2e/render.e2e.cjs` |
+| Materials + procedural textures, light pool | **Not implemented** (the harness has a 20-line sketch of the wet-ground shader) | planned `src/world/{textures,materials,lights}.js` |
 | City block, warehouse, pier, garage, hotel/ops room | **Not implemented** | planned `src/world/{world,city,warehouse,pier,garage,hotel}.js` |
 | Input, collision, player, camera, interact, zones, touch | **Not implemented** | planned `src/core/input.js`, `src/world/{collision,player,camera,interact,zones}.js`, `src/ui/touch.js` |
 | Vehicle + dashboard telemetry | **Not implemented** | planned `src/world/{vehicle,carmodel}.js` |
@@ -131,31 +137,36 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | Missions, campaign, cinematics, save/load, app controller | **Not implemented** | planned `src/game/*` |
 | Audio | **Not implemented** | planned `src/core/audio.js` |
 | Context guard: thresholds 65 / 70 / 75 % of the context window, handoff verification, resume prompt | **Done, verified** — 7 simulation tests; on the real harness (separate headless process) SessionStart, UserPromptSubmit, PreToolUse deny, PostToolBatch and Stop all fired. Not verified live: the status line (no terminal UI in cloud sessions), PreCompact, and the one-time loop stop at 75 % | `.claude/settings.json`, `.claude/hooks/context-guard.{mjs,config.json,test.mjs}`, `docs/RESUME_PROMPT.md` |
-| Boot wiring | **Partial** — learning core only (ctx, math, profile, session, tutor, selfTest); no renderer, world, UI or missions | `src/main.js` |
+| Boot wiring | **Partial** — learning core + rendering core (ctx, math, profile, session, tutor, gfx, env, weather, selfTest). The loop is NOT started (nothing to show); `?norender=1` skips WebGL. No world, UI or missions | `src/main.js` |
 
 ---
 
 ## 4. Current unfinished work (resume exactly here)
 
-**Nothing is half-done.** P0 tasks 1 (math engine) and 2 (learner model) are complete, committed and pushed.
+**Nothing is half-done.** P0 tasks 1 (math engine), 2 (learner model) and 3 (rendering core) are complete, committed and
+pushed.
 
-- **Last successful results:** `npm test` → 28 tests, 28 pass (7 core/layout, 9 math, 12 learning);
-  `node --test .claude/hooks/context-guard.test.mjs` → 7/7 pass; `npm run e2e` → 2/2 scenarios pass; `npm run build` → `dist/narco-shadow-empire.html` (120 KB).
-- **Current errors:** none known.
-- **How the tests were checked:** 14 deliberate one-line breaks (credit rule, reveal gate, SRS delay, leak check,
-  independent check, displayed equation …) were applied one at a time; the suite failed for all 14 after one gap
-  was closed (the recall quiz repeating a seen question now has its own test).
+- **Last successful results:** `npm test` → 41 tests, 41 pass (7 core/layout, 9 math, 12 learning, 13 rendering);
+  `node --test .claude/hooks/context-guard.test.mjs` → 7/7; `npm run e2e` → 3/3 scenarios (learning on the dev page,
+  learning in the single-file build from `file://`, rendering core with 17 checks); `npm run build` → 664 KB.
+- **Current errors:** none known. The only console noise is Chromium's "GPU stall due to ReadPixels" warning, which
+  comes from software WebGL screenshots, not from the game.
+- **How the tests were checked:** ten deliberate one-line breaks in the rendering core (4K rule, fixed-4K sizing,
+  back-off of the dynamic scaler, night ambient floor, sun-moon hand-over, fog colour, `is4K` taken from the mode name,
+  rain drift, the `env:night` event, instant wetness). Eight failed the suite at once; two exposed gaps that were then
+  closed (a scaler scenario that needs the back-off, and a portrait window in fixed-4K mode). All ten are caught now.
 
-**Exact next action — P0 task 3, rendering core** (`docs/NEXT_TASKS.md`; spec in `docs/briefs/narco-world.workflow.js`):
-1. `src/world/renderer.js` → `ctx.gfx` (ARCHITECTURE §5): WebGLRenderer on `<canvas id="game">`, ACES tone mapping, sRGB
-   output, shadows, pixel-ratio / render-scale / fixed-4K modes driven by `ctx.settings` quality presets, an honest
-   `getInfo()` (real drawing-buffer size), `render(dt)` called by the loop. Bloom/grade (`post.js`) can follow.
-2. `src/world/environment.js` (sky dome, moon, hemisphere + directional light, fog, time of day, wetness) and
-   `src/world/weather.js` (camera-following rain).
-3. Harness `dev/render.html` (copy `dev/_template.html`); look at night-rain and day screenshots with
-   `node tools/shot.cjs "dev/render.html?quality=low" --w 640 --h 360 --out <png>`.
-4. Register the renderer in `src/main.js`, extend `src/game/selftest.js` with a renderer check, then continue with
-   P0 tasks 4–13 in order.
+**Exact next action — P0 task 4, materials** (`docs/NEXT_TASKS.md`; spec `B1B` in `docs/briefs/narco-world.workflow.js`):
+1. `src/world/textures.js`: seeded value-noise / fbm helpers on canvas `ImageData`, `makeMaps(kind, {size, seed})` →
+   `{map, normalMap (Sobel from a height field), roughnessMap}`, cached, size from `settings.textureSize`. Lean first
+   set: asphalt (+ puddle mask), sidewalk, concrete, brick, stucco, corrugated metal, crate wood, chain-link (alpha),
+   one facade atlas with lit windows, `textTexture` for signs and labels.
+2. `src/world/materials.js` → `ctx.mats` (`get`, `paint`, `neon` / `emissive`, `glass`, `sign` / `label`, `facade`).
+   Wettable materials follow `ctx.env.wetness` (move the sketch in `dev/render.html` → `wettable()` into the library:
+   darker albedo, lower roughness, puddles from the mask); night-only emissives follow `ctx.env.nightFactor`.
+3. Harness `dev/materials.html` (swatches on the render core); look at dry-day and wet-night screenshots.
+4. Then P0 tasks 5–13 in order. The first thing that needs `ctx.lights` is the city (task 6): decide there whether the
+   lean demo gets the pooled light system or a fixed handful of real lights (`settings.maxLights`).
 
 **Things the next layers can rely on (all tested):**
 - `ctx.math.fixed.trucks()` / `.equation()`; `ctx.math.check(q, {text})` → `{correct, tag, why, parseError}`;
@@ -167,8 +178,17 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 - `ctx.profile` getters for the dashboard: `section('AR'|'MK')`, `overall()`, `topic(id)`, `skillMap()`, `tier()`,
   `streak()`, `due()`, `mistakes()`, `recommend()`.
 - `createLinear(question.visual.params)` for the balance puzzle of 3(x − 2) = 21 (both routes verified).
+- Rendering (ARCHITECTURE §5 is up to date): add meshes to `ctx.gfx.scene`, move `ctx.gfx.camera`, start
+  `ctx.loop`; `ctx.env.setTime(22.5, {instant: true})` + `ctx.env.setWeather('rain', {instant: true})` give the opening
+  look; `ctx.gfx.getInfo()` for the FPS / resolution readout (show "4K" only when `is4K`); `ctx.gfx.project()` for HUD
+  markers; `ctx.weather.addEmitter()` for steam and smoke; `ctx.weather.setLights()` so rain glows near lamps.
+- Light levels that work with the exposure and bloom: street lamp ≈ 130 cd at 5.7 m, neon spill ≈ 20 cd, emissive
+  intensity 5–7 for tubes and lamp heads. Three times that washed the frame out (seen in the first screenshots).
+- A custom `ShaderMaterial` must end with `#include <tonemapping_fragment>` + `#include <colorspace_fragment>`, or it
+  will look wrong on one of the two render paths.
 
-**Tests still to write as the code appears:** everything visual and gameplay (screenshots + E2E per NEXT_TASKS).
+**Tests still to write as the code appears:** everything about the world, actors, UI and missions (screenshots + E2E
+per NEXT_TASKS).
 
 ---
 
@@ -225,6 +245,25 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
   - `recommend()` order differs slightly from the brief (exam before single due topic / drill) because the brief's
     order made the exam recommendation unreachable.
   - The self-test runs in a sandbox with its own in-memory storage, so it can never alter the saved profile.
+- **Decisions of session 3 (rendering core)**
+  - The drawing-buffer size is set explicitly (renderer pixel ratio stays 1), so the reported numbers are exact and
+    `fixed4k` cannot miss 3840×2160 by a rounding pixel. `is4K` is read from `gl.drawingBufferWidth/Height`.
+  - `fixed4k` targets "long side ≥ 3840 and short side ≥ 2160" so ultrawide and portrait windows get a 4K-class buffer,
+    but the label keeps the strict rule (width ≥ 3840 and height ≥ 2160): a portrait buffer is never called 4K.
+  - One final pass replaces three's OutputPass (tone map + grade + vignette + sRGB + grain + dither): one full-screen
+    pass less at 4K. Only the scene target carries depth and MSAA; the composer's second target gets GPU storage only
+    while AO is on. The canvas itself is created without antialiasing, so the `low` preset has none by definition.
+  - Bloom threshold and strength follow the light level (1.8 by day, 1.0 at night) because exposure alone does not span
+    day and night; otherwise sunlit walls bloom.
+  - The night key light is a stylised slow moon (west-south-west and 48° up at 22:30, never below 13°), so every night
+    hour has a usable key and the arrival shot from the pier is back-lit. Sun and moon hand over at zero intensity.
+  - Fog colour = sky horizon colour (seamless distance); the city glow is added above the horizon so far roofs read as
+    silhouettes. Fog is never thinner than 1.2 / `drawDistance`, which gives that setting a visible meaning already.
+  - Rain is animated in the vertex shader from two wrapped clocks kept on the CPU (fall time, accumulated wind drift):
+    the first version used `wind × time`, which would have teleported every streak on each gust.
+  - Stars keep about one pixel of radius at any resolution (an energy-conserving version made them invisible below 4K).
+  - REJECTED: tying the 4K label to the resolution mode; an antialiased canvas (doubles memory at 4K next to the MSAA
+    target); a second MSAA composer target; `drawDistance` as the camera far plane (pops in clear weather).
 
 ---
 
@@ -239,5 +278,10 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
   `context_window.used_percentage`). Hooks are loaded when a session process starts — settings edited mid-session
   are not picked up. When session 2 ended the context stood at about 66 % (prepare stage).
 - `node --test tests/unit/` (a directory) fails with MODULE_NOT_FOUND on Node 22 — use `npm test` or name the files.
+- Rendering in this container is software WebGL (SwiftShader): ~5 FPS at 960×540, ~25 s for one 3840×2160 frame, so a
+  4K screenshot times out — check 4K through `getInfo()` / `gfx.sample()` instead. Shader compiles take 1–2 s.
+- Context cost seen in session 3: reading the handoff, contract, brief and core files took the reading from 9 % to
+  about 25 %; the whole rendering core with ~25 screenshots ended near 50 %. Small viewports and filtered tool output
+  (pipe reports through a one-line summary) keep it down.
 - Git: commit on `claude/narco-shadow-empire-asvab-erthmj`, push with `git push -u origin <branch>`; no PR unless
   the user asks.

@@ -84,7 +84,7 @@ const SPLASH_VERT = /* glsl */`
   void main() {
     float age = ( uTime - aSplash.w ) / uLife;
     float live = step( 0.0, age ) * step( age, 1.0 );
-    float size = mix( 0.035, 0.17, age ) * ( 0.7 + 0.6 * aRnd );
+    float size = mix( 0.025, 0.12, age ) * ( 0.6 + 0.8 * aRnd );
     vec3 p = aSplash.xyz + vec3( position.x * size, 0.0, position.y * size );
     float dist = distance( cameraPosition, aSplash.xyz );
     vAge = age; vUv = position.xy;
@@ -234,7 +234,7 @@ export function createWeather(ctx) {
 
   const splashData = new Float32Array(MAX_SPLASHES * 4).fill(-1e6), splashRnd = new Float32Array(MAX_SPLASHES);
   for (let i = 0; i < MAX_SPLASHES; i++) splashRnd[i] = rng.next();
-  const splashU = { uLife: { value: SPLASH_LIFE }, uOpacity: { value: 0.75 }, uLampGain: { value: 0.16 } };
+  const splashU = { uLife: { value: SPLASH_LIFE }, uOpacity: { value: 0.5 }, uLampGain: { value: 0.16 } };
   const splashGeo = instanced(QUAD_C, [['aSplash', splashData, 4], ['aRnd', splashRnd, 1]]);
   const splashes = mesh('weather.splashes', splashGeo, material('weather.splashes', SPLASH_VERT, SPLASH_FRAG, splashU, THREE.AdditiveBlending), 21);
 

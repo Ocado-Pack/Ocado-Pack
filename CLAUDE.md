@@ -21,6 +21,9 @@ call → drive to the warehouse → AR problem "3 trucks × 18 cases − 14 = 40
 - `node tools/shot.cjs "<page>?quality=low" --out <png> [--eval "js"] [--scenario f.cjs]` → headless Chromium
   screenshot + console/page-error report (software WebGL, a few FPS; use small viewports)
 - `npm run e2e` → scenarios in `tests/e2e/*.e2e.cjs` · `npm run build` → `dist/narco-shadow-empire.html`
+- Rendering harness: `dev/render.html?time=22.5&weather=rain&quality=medium&cam=street` (parameters in its header);
+  `node tools/shot.cjs "dev/render.html?quality=medium" --w 960 --h 540 --scenario dev/render.shots.cjs` → the whole
+  time × weather screenshot matrix in `dev/out/`. A 4K frame takes ~25 s in software WebGL: read numbers, don't screenshot it.
 
 ## Non-negotiable rules
 - three.js **r160**, vendored in `vendor/three` (`import * as THREE from 'three'`, addons from `three/addons/…`).

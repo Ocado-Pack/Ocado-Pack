@@ -45,8 +45,9 @@ index.html                     dev entry (import map + stylesheet list + <canvas
 src/main.js                    boot / wiring (integration owns)
 src/core/                      context, events, rng, storage, settings, i18n, flow, loop, util, ltext, params, input, audio
 src/world/layout.js            district layout: THE spatial contract (anchors, stations, footprints, zones, features)
-src/world/                     renderer, post, environment, weather, textures, materials, lights, props, city, warehouse,
-                               garage, hotel, pier, collision, zones, interact, character, npc, player, camera, vehicle, traffic
+src/world/                     renderer, post, resolution*, environment, skymodel*, weather, textures, materials, lights, props,
+                               city, warehouse, garage, hotel, pier, collision, zones, interact, character, npc, player, camera,
+                               vehicle, traffic                     (* pure modules: no three.js, unit-tested in Node)
 src/math/                      question engine (pure): rational, format, kit, engine, registry, topics, answer, linear,
                                templates/ar/*.js, templates/mk/*.js
 src/learning/                  learner model (pure): profile, mastery, adaptive, srs, tutor, session, exam, recommend
@@ -114,7 +115,8 @@ freeCursor})`. Gameplay code checks `ctx.flow.worldInput`; the sim stops when `c
 | `interact:use` | `{id, interactable}` |
 | `player:step` / `player:jump` / `player:land` | `{surface, running}` / `{}` / `{speed}` |
 | `vehicle:enter` / `vehicle:exit` / `vehicle:collision` | `{vehicle}` / `{vehicle}` / `{speed}` |
-| `env:time` / `env:night` / `env:weather` | `{hour}` (≤ 2/s) / `{night:boolean}` / `{weather, intensity}` |
+| `env:time` / `env:night` / `env:weather` | `{hour}` (≤ 2/s) / `{night:boolean}` (at 19:00 and 06:00) / `{weather, intensity}` |
+| `env:lightning` | `{strength 0–1, delay}` — storm only; `delay` = seconds until the thunder should be heard |
 | `world:feature` | `{id, on}` |
 | `mission:start` / `mission:step` / `mission:objective` / `mission:checkpoint` / `mission:complete` | `{missionId}` / `{missionId, stepId, index, total, phase}` / `{text, marker}` / `{missionId, stepId}` / `{missionId, report}` |
 | `puzzle:open` / `puzzle:answer` / `puzzle:solved` / `puzzle:close` | `{question, spec}` / `{questionId, correct, attempt, hintLevel}` / `{questionId, result}` / `{aborted}` |
@@ -128,6 +130,7 @@ freeCursor})`. Gameplay code checks `ctx.flow.worldInput`; the sim stops when `c
 | `cinematic:start` / `cinematic:end` | `{id}` |
 | `ui:menu` | `{action:'continue'|'new'|'mission'|'drills'|'exam'|'dashboard'|'freeroam'|'quit', missionId?}` — the app controller handles |
 | `gfx:resize` / `gfx:quality` | `{cssW, cssH, bufferW, bufferH, pixelRatio}` / `{preset}` |
+| `gfx:contextlost` / `gfx:contextrestored` | `{}` — GPU resources are rebuilt automatically; re-create anything you cached from the GPU |
 | `save:written` / `save:loaded` | `{slot}` |
 | `audio:unlocked` | `{}` |
 
@@ -155,36 +158,68 @@ Builders must match footprints/door openings and put a visible prop at every sta
 
 ## 5. Rendering & world systems
 
-### `ctx.gfx` — renderer (`src/world/renderer.js`)
+### `ctx.gfx` — renderer (`src/world/renderer.js`, `post.js`, `resolution.js`) — **implemented**
 ```js
-gfx.renderer, gfx.scene, gfx.camera (PerspectiveCamera), gfx.canvas, gfx.composer
+gfx.renderer, gfx.scene, gfx.camera (PerspectiveCamera, fov = settings.fov, near 0.1, far 1200), gfx.canvas, gfx.composer
 gfx.render(dt)                 // called by the loop
-gfx.resize()                   // also on window resize
-gfx.getInfo()                  // {cssW, cssH, bufferW, bufferH, pixelRatio, preset, is4K (bufferW>=3840&&bufferH>=2160), fps, drawCalls, triangles}
-gfx.setExposure(v) · gfx.screenToRay(x, y) → {origin, direction} · gfx.project(vec3) → {x, y, visible}  (CSS pixels)
+gfx.resize()                   // also automatic: window resize, ResizeObserver, devicePixelRatio change
+gfx.getInfo()                  // {cssW, cssH, bufferW, bufferH, pixelRatio, preset, is4K, fps, drawCalls, triangles,
+                               //  mode, limited, dynamicScale, post, msaa, shadows, frames, webgl2, unavailable, contextLost}
+gfx.setExposure(v) · gfx.exposure · gfx.setBloom({strength, radius, threshold, knee}) · gfx.setGrade({contrast, saturation, vignette, split, shadowTint, highlightTint})
+gfx.screenToRay(x, y) → {origin, direction} · gfx.project(vec3) → {x, y, visible, depth, behind}  (CSS pixels)
+gfx.sample(n = 6) → {luma, min, max, mean, lumas} | null    // draws a frame and reads an n×n pixel grid back (tests, self-test)
+gfx.unavailable · gfx.contextLost · gfx.postActive · gfx.maxAnisotropy · gfx.dispose()
 ```
-ACES tone mapping, sRGB output, PCF soft shadows, EffectComposer chain (bloom → grade/vignette/grain → output), MSAA
-render target per preset. Honest resolution: `resolutionMode` `'native'` (device pixels), `'fixed4k'` (≈3840×2160
-internal buffer at the window's aspect), `'dynamic'` (scale to hold `targetFps`). Never label anything "4K" unless
-`getInfo().is4K`.
+- **Honest resolution.** `bufferW/H` are the real drawing-buffer size and `is4K` is `bufferW ≥ 3840 && bufferH ≥ 2160` — the
+  only test that may put "4K" on screen. `settings.resolutionMode`: `'native'` (min(devicePixelRatio, maxPixelRatio) ×
+  renderScale), `'fixed4k'` (an internal buffer of at least 3840×2160 at the window's aspect; the browser scales it down;
+  a GPU limit or the 1.5 × UHD pixel budget makes it smaller, sets `limited` and drops the label), `'dynamic'` (native ×
+  a factor between pixel ratio 0.5 and native that holds `targetFps`, with back-off so it does not oscillate).
+- **Two render paths.** Post chain (HDR half-float target, MSAA `settings.msaa`, optional GTAO `settings.ao`, bloom
+  `settings.bloom`, then ONE final pass: ACES tone mapping → contrast / split toning / vignette → sRGB → grain
+  `settings.grain` → dither). When bloom, grain, ao and msaa are all off (the `low` preset) the scene is drawn straight to
+  the canvas with the renderer's own ACES + sRGB. Custom `ShaderMaterial`s must therefore end with
+  `#include <tonemapping_fragment>` and `#include <colorspace_fragment>` to look the same on both paths.
+- Reacts live to every graphics setting. `shadows` `'off' | 'low' (PCF) | 'high' (PCF soft)`. Context loss shows a message
+  and recovers. If WebGL cannot start, `gfx.unavailable` is true, a bilingual message is shown and every method is a safe
+  no-op (`gfx.scene` / `gfx.camera` still exist).
+- Light units are r160 physical ones: a white surface facing a directional light of intensity I has radiance I / π.
+  Daylight is ≈ 3.3, moonlight ≈ 0.5, a street lamp ≈ 130 cd, a neon tube's spill light ≈ 20 cd; emissive surfaces of
+  intensity ≥ 4 glow through the bloom. Brighter lamps wash the frame out.
 
 ### `ctx.mats` — materials & procedural textures (`src/world/materials.js`, `textures.js`)
 `mats.get(name)` returns a cached PBR material (asphalt, wet asphalt with puddles, sidewalk, concrete, brick, plaster,
 corrugated/painted/rusted metal, steel, chain-link (alpha), glass, wood/crate, cardboard, rubber, plastic, fabric,
 water, emissive/neon by colour, screens). `mats.text(…)` / `mats.sign(…)` make canvas-text textures for signs,
-labels, tags and monitors. Texture resolution follows `settings.textureSize`.
+labels, tags and monitors. Texture resolution follows `settings.textureSize`. Wettable materials read `ctx.env.wetness`
+(`dev/render.html` has a working sketch of the technique: darker albedo, lower roughness, mirror-like puddles from noise).
 
-### `ctx.env` — sky, time of day, fog (`src/world/environment.js`)
+### `ctx.env` — sky, time of day, fog (`src/world/environment.js`, `skymodel.js`) — **implemented**
 ```js
-env.setTime(hour 0–24, {instant?}) · env.hour · env.isNight · env.setClockRate(gameMinutesPerRealSecond)
-env.setWeather('clear'|'rain'|'storm'|'fog'|'overcast'|'dust', {intensity?:0–1, instant?}) · env.weather · env.wetness (0–1)
-env.sunDir (Vector3) · env.update(dt)
+env.setTime(hour 0–24, {instant?}) · env.hour · env.isNight · env.nightFactor (0–1, smooth) · env.setClockRate(gameMinutesPerRealSecond)
+env.setWeather('clear'|'rain'|'storm'|'fog'|'overcast'|'dust', {intensity?:0–1, instant?, seconds?}) · env.weather · env.intensity
+env.wetness (0–1) · env.setWetness(v) · env.rain (0–1.3 right now) · env.cloud · env.flash (lightning 0–1) · env.wind {x, z, speed} m/s
+env.sunDir · env.moonDir · env.keyDir (Vector3, direction TO the light) · env.key (DirectionalLight) · env.hemi · env.fog · env.dome
+env.state                      // everything skymodel.js computed for this moment (linear RGB arrays): fogColor, hemiSky, keyColor, …
+env.refreshEnvironment() · env.update(dt) · env.dispose()
 ```
-Day/night changes sky, sun/moon light, hemisphere light, fog, exposure and emits `env:night` (lamps, neon and
-windows listen). Rain intensity/wetness drive road gloss, the rain particles and audio.
+Day/night changes the sky dome (shader: gradient, clouds, sun, moon, stars, city glow), the one shadow-casting key light
+(sun by day, a stylised slow moon at night; the hand-over happens at zero intensity), the hemisphere light, FogExp2 (its
+colour is the sky's horizon colour, and never thinner than 1.2 / `settings.drawDistance`), exposure and the bloom level,
+and emits `env:night` (lamps, neon and windows listen; fade with `env.nightFactor`). `scene.environment` is a small
+prefiltered reflection map of the sky plus, at night, coloured panels standing in for city neon; it is rebuilt when the
+light changes materially (throttled). Shadows stay sharp around the player (or ahead of the camera) with texel snapping.
+Without a renderer (`?norender=1`) the clock, weather, wetness and events still run.
 
-### `ctx.weather` — rain streaks, splashes, lightning, smoke, dust, steam (`src/world/weather.js`)
-Self-driven from `ctx.env` and `ctx.zones.indoor`. `weather.addEmitter({type:'steam'|'smoke'|'dust', position, …})`.
+### `ctx.weather` — rain streaks, splashes, steam, smoke, dust, spray (`src/world/weather.js`) — **implemented**
+```js
+weather.addEmitter({type:'steam'|'smoke'|'dust'|'spray', position, rate?, size?, rise?, color?, radius?, alpha?}) → {position, enabled, setEnabled(b), setRate(r), remove()}
+weather.setLights([{position: Vector3, color, intensity, distance}, …])   // lamps that light the rain; the 4 with the most effect near the camera are used
+weather.stats() → {streaks, splashes, particles, emitters} · weather.update(dt) · weather.dispose()
+```
+Self-driven from `ctx.env` (rain amount, wind, light colours, fog) and `ctx.zones.indoor` (rain fades out indoors).
+Rain count = 9000 × `settings.rainDensity` × rain; particles scale with `settings.particles`. Three draw calls.
+The light pool (or the vehicle's headlights) should call `weather.setLights` so rain lights up near lamps.
 
 ### `ctx.lights` — light pool (`src/world/lights.js`)
 ```js
@@ -550,5 +585,8 @@ charts, rooftop angles) · **5 Final Operation** (timed mixed AR/MK). Adding a c
   It prints console errors/page errors; it starts its own server on a free port (no port clashes).
 - A page signals readiness with `window.__ready = true`.
 - Each module has a harness page `dev/<module>.html` that boots a context with only what it needs.
+  `dev/render.html` is the rendering-core harness (URL parameters in its header comment);
+  `node tools/shot.cjs "dev/render.html?quality=medium" --w 960 --h 540 --scenario dev/render.shots.cjs` writes the whole
+  time-of-day × weather matrix to `dev/out/` (git-ignored). Look at the images; `tests/e2e/render.e2e.cjs` checks behaviour.
 - Performance budget (High preset, 1080p, mid-range laptop GPU): ≤ 350 draw calls, ≤ 1.5 M triangles in view, ≤ 12
   real lights, one 2048² shadow map. Merge static geometry per material; instance repeated props.

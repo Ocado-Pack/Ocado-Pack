@@ -17,11 +17,11 @@ the demo target is roughly 7k lines in total.
 2. **Learner model** — **DONE (session 2).** `profile.js`, `tutor.js`, `session.js`, `index.js`
    (`createLearning(ctx, {now})`), `tests/unit/learning.test.mjs`; plus `src/game/selftest.js` and two browser
    scenarios in `tests/e2e/`. Still open and deferred to P1: `exam.js`, `explain.js`.
-3. **Rendering core** *(next — start here)*: `src/world/renderer.js` (ctx.gfx: ACES, sRGB, shadows, EffectComposer bloom + grade,
-   pixel-ratio / render-scale / fixed-4K / dynamic modes, honest `getInfo()`), `environment.js` (sky dome, moon/sun,
-   hemisphere light, fog, time of day, wetness), `weather.js` (camera-following rain streaks + splashes). Harness
-   `dev/render.html`; look at night-rain and day screenshots.
-4. **Materials**: `src/world/textures.js` + `materials.js` — compact procedural set: wet asphalt, sidewalk,
+3. **Rendering core** — **DONE (session 3).** `src/world/{renderer,post,resolution,environment,skymodel,weather}.js`,
+   harness `dev/render.html` + `dev/render.shots.cjs`, `tests/unit/render.test.mjs` (13), `tests/e2e/render.e2e.cjs` (17
+   checks), self-test extended to 11. Wired into `src/main.js`. Open items moved to P1: rain blocked by roofs, a frame-rate
+   pass on a real GPU, a look at the dust / spray emitters and at AO.
+4. **Materials** *(next — start here)*: `src/world/textures.js` + `materials.js` — compact procedural set: wet asphalt, sidewalk,
    concrete, brick, stucco facade atlas with lit windows, corrugated metal, crate wood, chain-link, glass,
    neon/emissive, canvas-text signs and labels.
 5. **Actors core**: `src/core/input.js` (keyboard + mouse with pointer-lock and drag-look fallback, `setVirtual`
@@ -76,7 +76,11 @@ the demo target is roughly 7k lines in total.
 - Visual lab manipulatives (fraction, percent, balance, geometry, route, bars, number line).
 - Extend `window.__game.selfTest()` (`src/game/selftest.js`, learning core only today) to the whole acceptance list;
   README for the game folder.
-- Day/night transitions per mission, smoke/dust/steam emitters, light pool for many lamps.
+- Day/night transitions per mission (the clock and transitions exist: `env.setTime`, `env.setClockRate`), light pool
+  for many lamps (`ctx.lights`, feeding `ctx.weather.setLights`).
+- Rendering follow-ups: keep rain out of covered spaces seen from outside (a top-down depth map or per-zone volumes);
+  measure the presets on a real GPU against the budget in ARCHITECTURE §12 and tune `QUALITY_PRESETS`; look at AO on
+  real scenery; a graphics settings screen that shows `gfx.getInfo()` and labels "4K" only when `is4K`.
 
 ## P2 — polish and expansion
 
