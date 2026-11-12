@@ -97,3 +97,7 @@ the demo target is roughly 7k lines in total.
 3. Confirm the CAT-style exam timing preset once the official figures can be checked.
 4. Start a fresh cloud session automatically at the 75 % hard stop? The session tools can do it, but it is
    deliberately not automated: every new session spends usage and an unattended relay could repeat. Needs an explicit yes.
+5. Close the guard's gap for MCP tools? The 75 % block covers the shell, file edits and sub-agents, but not MCP tools:
+   GitHub write tools and the remote-session tools stay allowed at every stage (shown by
+   `node .claude/hooks/context-guard.sweep.mjs`). The fix is a few lines in `gate()` plus a test; it changes what the
+   guard refuses, so it needs the owner's yes.

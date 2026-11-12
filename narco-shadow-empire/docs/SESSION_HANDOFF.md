@@ -1,6 +1,6 @@
 # SESSION HANDOFF — NARCO: SHADOW EMPIRE (Operation Numbers)
 
-Snapshot: 2026-11-12, end of session 3 (rendering core, materials, collision, input, zones, motion) · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
+Snapshot: 2026-11-12, end of session 3 (rendering core, materials, collision, input, zones, motion; context guard re-verified live) · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
 (all paths below are relative to it). Read with `docs/NEXT_TASKS.md` and `docs/ARCHITECTURE.md`.
 
 > **Honest one-line status:** the learning core (question engine for 4 of 20 topics, learner profile, tutor hint ladder,
@@ -142,7 +142,7 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | Puzzle panel + tutor UI, debrief, dashboard, drills, exam UI, visual lab | **Not implemented** | planned `src/ui/*` |
 | Missions, campaign, cinematics, save/load, app controller | **Not implemented** | planned `src/game/*` |
 | Audio | **Not implemented** | planned `src/core/audio.js` |
-| Context guard: thresholds 65 / 70 / 75 % of the context window, handoff verification, resume prompt | **Done, verified** — 7 simulation tests; on the real harness (separate headless process) SessionStart, UserPromptSubmit, PreToolUse deny, PostToolBatch and Stop all fired. Not verified live: the status line (no terminal UI in cloud sessions), PreCompact, and the one-time loop stop at 75 % | `.claude/settings.json`, `.claude/hooks/context-guard.{mjs,config.json,test.mjs}`, `docs/RESUME_PROMPT.md` |
+| Context guard: thresholds 65 / 70 / 75 % of the context window, handoff verification, resume prompt | **Done, verified** — 7 simulation tests + a boundary sweep (64.9 / 65 / 69.9 / 70 / 74.9 / 75). **Live in session 3, on the real harness:** the log shows a reading after every tool batch; the PREPARE notice fired on real usage at 65 % (650K tokens); with a temporary status-line snapshot the 66 % and 71 % notices appeared and at 76 % a development command (`node -e …`) and a project file write were REFUSED while `git status` ran. **Not observed live:** the one-time loop stop at 75 % with a verified handoff (simulation only), the stop-block at 70 %, the status line, PreCompact. **Gap:** MCP tools are not gated at any stage (`mcp__github__push_files`, `mcp__claude-code-remote__create_session` are allowed even at 75 %) | `.claude/settings.json`, `.claude/hooks/context-guard.{mjs,config.json,test.mjs,sweep.mjs}`, `docs/RESUME_PROMPT.md` |
 | Boot wiring | **Partial** — learning core + rendering core + first actor systems (ctx, math, profile, session, tutor, gfx, env, weather, mats, collision, zones, input, selfTest). The loop is NOT started (nothing to show); `?norender=1` skips WebGL. No world, UI or missions | `src/main.js` |
 
 ---
@@ -157,6 +157,8 @@ zones and the character motion rules. Everything is committed and pushed.
   5 texture generator, 8 collision, 5 input + zones, 5 motion); `node --test .claude/hooks/context-guard.test.mjs` → 7/7; `npm run e2e` → 4/4 scenarios
   (learning on the dev page, learning in the single-file build from `file://`, rendering core with 18 checks,
   materials with 6 checks); `npm run build` → 693 KB.
+- **Context at this handoff:** 65 % of the window (the real PREPARE notice fired at 650K tokens). Start the next
+  milestone in a fresh session with `docs/RESUME_PROMPT.md`.
 - **Current errors:** none known. The only console noise is Chromium's "GPU stall due to ReadPixels" warning, which
   comes from software WebGL screenshots, not from the game.
 - **How the tests were checked:** ten deliberate one-line breaks in the rendering core (4K rule, fixed-4K sizing,
@@ -309,6 +311,19 @@ per NEXT_TASKS).
   status line, so the guard reads the newest API usage from the session transcript (same formula as
   `context_window.used_percentage`). Hooks are loaded when a session process starts — settings edited mid-session
   are not picked up. When session 2 ended the context stood at about 66 % (prepare stage).
+- **What the 75 % threshold does (checked in session 3):** it is a real block, not only a message. The PreToolUse hook
+  returns a deny, and the harness then refuses the call: every `Bash` command outside a short allowlist (reading tools,
+  non-destructive `git`, `npm test`, `node --test`, the guard CLI; redirections only into the handoff documents or
+  `.claude/state/`), every `Write` / `Edit` to a project file that is not a handoff document, and sub-agents / workflows
+  (those already from 65 %, together with destructive git). With a verified handoff the PostToolBatch hook also stops the
+  agent loop once. It does NOT clear the context, end the session, commit or push; the model can still answer in text and
+  finish the handoff. Limits: MCP tools are not covered; `touch .claude/state/guard-off` (the owner's switch) lifts
+  everything; without usage data the guard can only warn; a reading is one API response old.
+- **Re-running the live check:** write `{"pct": 76, "at": <Date.now()>, "size": 1000000}` to
+  `.claude/state/statusline-<session id>.json` (git-ignored; expires after 10 minutes), try a development command,
+  then neutralise it with `echo '{}' > .claude/state/statusline-<session id>.json` (allowed at every stage). Keep one
+  untracked file in the tree meanwhile, or the verified-handoff loop stop ends the turn. `node
+  .claude/hooks/context-guard.sweep.mjs` prints the allow / refuse table around each threshold.
 - `node --test tests/unit/` (a directory) fails with MODULE_NOT_FOUND on Node 22 — use `npm test` or name the files.
 - Rendering in this container is software WebGL (SwiftShader): ~5 FPS at 960×540, ~25 s for one 3840×2160 frame, so a
   4K screenshot times out — check 4K through `getInfo()` / `gfx.sample()` instead. Shader compiles take 1–2 s.

@@ -49,6 +49,8 @@ call → drive to the warehouse → AR problem "3 trucks × 18 cases − 14 = 40
   `narco-shadow-empire/docs/RESUME_PROMPT.md`.
 - `node .claude/hooks/context-guard.mjs status` shows the reading · tests: `node --test .claude/hooks/context-guard.test.mjs`
   · the user can lift the guard with `touch .claude/state/guard-off`. The guard never commits, pushes or deletes.
+- The 75 % block is enforced by the harness for the shell, file edits and sub-agents (verified live); MCP tools are not
+  gated. `node .claude/hooks/context-guard.sweep.mjs` prints what is allowed and refused around each threshold.
 
 ## Working style that fits this project
 - **Token budget is the binding constraint.** A 21-agent parallel fan-out at maximum reasoning effort exhausted
