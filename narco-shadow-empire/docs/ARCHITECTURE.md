@@ -187,12 +187,28 @@ gfx.unavailable · gfx.contextLost · gfx.postActive · gfx.maxAnisotropy · gfx
   Daylight is ≈ 3.3, moonlight ≈ 0.5, a street lamp ≈ 130 cd, a neon tube's spill light ≈ 20 cd; emissive surfaces of
   intensity ≥ 4 glow through the bloom. Brighter lamps wash the frame out.
 
-### `ctx.mats` — materials & procedural textures (`src/world/materials.js`, `textures.js`)
-`mats.get(name)` returns a cached PBR material (asphalt, wet asphalt with puddles, sidewalk, concrete, brick, plaster,
-corrugated/painted/rusted metal, steel, chain-link (alpha), glass, wood/crate, cardboard, rubber, plastic, fabric,
-water, emissive/neon by colour, screens). `mats.text(…)` / `mats.sign(…)` make canvas-text textures for signs,
-labels, tags and monitors. Texture resolution follows `settings.textureSize`. Wettable materials read `ctx.env.wetness`
-(`dev/render.html` has a working sketch of the technique: darker albedo, lower roughness, mirror-like puddles from noise).
+### `ctx.mats` — materials & procedural textures (`src/world/materials.js`, `textures.js`, `texgen.js`*) — **implemented**
+```js
+mats.get(name, opts?) → cached MeshStandardMaterial      // opts are texture options: {color, palette, rust, seed, boards, stains}
+   // textured: asphalt sidewalk curb concrete concreteStained concreteFloor brick brickDark brickPainted stucco
+   //           metalCorrugated metalCorrugatedRust woodCrate woodPlank chainlink (alpha-tested, double-sided)
+   // plain:    steel metalDark chrome rubber plastic paper        · unknown names warn and return magenta
+mats.paint(color, {roughness, metalness}) · mats.emissive(color, intensity = 5, {nightOnly}) · mats.neon(color, intensity = 5.5)
+mats.glass({tint, opacity}) · mats.facade(style, {seed, color, lit})      // style: stucco | brick | office | tile | industrial
+mats.sign(text | lines[], {color, background, border, glow, width, height, lit = true, nightOnly, intensity}) · mats.label(text, opts)
+mats.setNightFactor(v | null) · mats.wetness · mats.update() · mats.stats() → {materials, nightOnly, textures, bytesEstimate} · mats.textures · mats.dispose()
+```
+- **World-scale UVs.** `material.userData.meters` is the real width of one texture repeat (asphalt 4, sidewalk 2 = 2×2
+  slabs, concrete 3, brick 1.35 = 6 bricks × 18 courses, stucco 3, corrugated 1.2, wood 1, chain-link 1, facade 12 =
+  4 bays × 4 floors). Builders give UVs in metres divided by it. Signs carry `userData.aspect` (width / height).
+- **Wetness.** Wettable materials share one uniform fed from `ctx.env.wetness`: darker albedo, half the roughness, and on
+  surfaces facing up mirror-like puddles from world-space noise (so they never repeat with the texture).
+- **Night.** Facade windows (`emissiveMap`) and `nightOnly` signs / emissives scale with `ctx.env.nightFactor`.
+- Textures come from `texgen.js` (* pure typed-array generator, unit-tested in Node: deterministic per seed, seamless,
+  about 100 ms per 512 px set). Size follows `settings.textureSize` (tiling surfaces use half of it, facades all of it,
+  with half-size normal / roughness / emissive maps). All of it is generated lazily on first use; `mats.textures.text()`
+  draws sign text on a canvas. Texture maps: `map` (sRGB), `normalMap`, and one ORM-style map (R puddle mask,
+  G roughness, B metalness) used as `roughnessMap` and `metalnessMap`.
 
 ### `ctx.env` — sky, time of day, fog (`src/world/environment.js`, `skymodel.js`) — **implemented**
 ```js
@@ -588,5 +604,6 @@ charts, rooftop angles) · **5 Final Operation** (timed mixed AR/MK). Adding a c
   `dev/render.html` is the rendering-core harness (URL parameters in its header comment);
   `node tools/shot.cjs "dev/render.html?quality=medium" --w 960 --h 540 --scenario dev/render.shots.cjs` writes the whole
   time-of-day × weather matrix to `dev/out/` (git-ignored). Look at the images; `tests/e2e/render.e2e.cjs` checks behaviour.
+  `dev/materials.html` is the material showroom (`cam=front|ground|wall|wall2|facade|sign`, `wet=`, `night=`).
 - Performance budget (High preset, 1080p, mid-range laptop GPU): ≤ 350 draw calls, ≤ 1.5 M triangles in view, ≤ 12
   real lights, one 2048² shadow map. Merge static geometry per material; instance repeated props.

@@ -1,0 +1,80 @@
+<!doctype html>
+<!-- Material library showroom (ctx.mats on the rendering core): ground, sidewalk, a wall of 2.4 m panels, five facades,
+     neon, signs, glass, metal.
+     node tools/shot.cjs "dev/materials.html?quality=medium&time=22.5&weather=rain&cam=front" --w 960 --h 540 --out dev/out/mats.png
+     URL: time=22.5 · weather=rain · wet=0..1 (force) · night=0..1 (force the night factor) · quality · cam=front|ground|wall|wall2|facade|sign -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>materials harness</title>
+<style>html,body{margin:0;height:100%;background:#05070b;color:#e8eef5;overflow:hidden;font:14px system-ui}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block}#ui{position:fixed;inset:0;pointer-events:none}</style>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui"></div>
+<script type="module">
+import * as THREE from 'three';
+import { createContext } from '../src/core/context.js';
+import { createRenderer } from '../src/world/renderer.js';
+import { createEnvironment } from '../src/world/environment.js';
+import { createWeather } from '../src/world/weather.js';
+import { createMaterials } from '../src/world/materials.js';
+
+const ctx = createContext(), p = ctx.params;
+const gfx = createRenderer(ctx), env = createEnvironment(ctx), weather = createWeather(ctx), mats = createMaterials(ctx);
+const { scene, camera } = gfx;
+
+/** World-scale UVs: one texture repeat every material.userData.meters. */
+const scaleUv = (g, su, sv) => { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv); return g; };
+const plane = (w, h, mat) => { const m = mat.userData.meters || 1; const o = new THREE.Mesh(scaleUv(new THREE.PlaneGeometry(w, h), w / m, h / m), mat); o.receiveShadow = true; scene.add(o); return o; };
+const box = (w, h, d, mat) => { const m = mat.userData.meters || 1; const o = new THREE.Mesh(scaleUv(new THREE.BoxGeometry(w, h, d), Math.max(w, d) / m, h / m), mat); o.castShadow = o.receiveShadow = true; scene.add(o); return o; };
+
+const road = plane(40, 14, mats.get('asphalt')); road.rotation.x = -Math.PI / 2; road.position.set(0, 0, 3);
+const walk = plane(40, 3.2, mats.get('sidewalk')); walk.rotation.x = -Math.PI / 2; walk.position.set(0, 0.15, -5.4);
+const curb = box(40, 0.15, 0.25, mats.get('curb')); curb.position.set(0, 0.075, -3.9);
+const back = plane(60, 30, mats.get('concreteFloor')); back.rotation.x = -Math.PI / 2; back.position.set(0, -0.02, -22);
+
+const panels = [['brick'], ['brickDark'], ['brickPainted'], ['stucco'], ['stucco', { color: 0x7fa0b0 }], ['concrete'], ['concreteStained'], ['metalCorrugated'], ['metalCorrugatedRust'], ['woodPlank'], ['chainlink']];
+panels.forEach(([name, o], i) => {
+  const x = (i - (panels.length - 1) / 2) * 2.6, m = plane(2.4, 2.4, mats.get(name, o)); m.position.set(x, 1.5, -7); m.castShadow = true;
+  const lab = mats.label(name + (o ? ' *' : ''), { width: 512, height: 96 }); const l = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.3), lab); l.position.set(x, 0.46, -6.95); scene.add(l);
+});
+['stucco', 'brick', 'office', 'tile', 'industrial'].forEach((style, i) => { const f = plane(12, 12, mats.facade(style, { seed: i + 1 })); f.position.set((i - 2) * 12.2, 6, -16); f.castShadow = true; });
+
+const crate = box(1, 1, 1, mats.get('woodCrate')); crate.position.set(-6, 0.5, -1.5); crate.rotation.y = 0.5;
+for (const [name, x] of [['chrome', -3.6], ['steel', -2.2], ['metalDark', -0.8], ['rubber', 0.6]]) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.5, 40, 20), mats.get(name)); s.position.set(x, 0.5, -1.5); s.castShadow = true; scene.add(s); }
+const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.8), mats.glass()); pane.position.set(2.6, 0.95, -1.5); scene.add(pane);
+const lamps = [];
+[[0xff2d95, -9], [0x22e0ff, 0], [0xffb020, 9]].forEach(([c, x]) => {
+  const t = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.1, 0.1), mats.neon(c)); t.position.set(x, 3.2, -6.9); scene.add(t);
+  const l = new THREE.PointLight(c, 22, 14, 2); l.position.set(x, 3.1, -5.9); scene.add(l); lamps.push({ position: l.position, color: l.color, intensity: l.intensity, distance: l.distance });
+});
+for (const x of [-11, 11]) { const l = new THREE.PointLight(0xffb46b, 130, 28, 2); l.position.set(x, 5.7, -2); scene.add(l); lamps.push({ position: l.position, color: l.color, intensity: l.intensity, distance: l.distance }); const h = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.24), mats.emissive(0xffa040, 7)); h.position.copy(l.position).y += 0.18; scene.add(h); }
+weather.setLights(lamps);
+const sign = (text, o, w, x, y) => { const m = mats.sign(text, o); const s = new THREE.Mesh(new THREE.PlaneGeometry(w, w / m.userData.aspect), m); s.position.set(x, y, -6.85); scene.add(s); };
+sign('FARMACIA', { color: '#7dffb0', glow: '#2bff8a', width: 512, height: 128 }, 3, -4.5, 3.6);
+sign(['BODEGA 7', 'ALMACENES MARÍTIMOS CENIZA'], { color: '#ffd9a0', background: '#1a1410', border: '#ffb46b', width: 768, height: 256, nightOnly: true }, 3.6, 4.5, 3.8);
+
+const cams = { front: [[0, 4.2, 12], [0, 3.2, -8]], ground: [[-3, 0.9, 2.5], [-1, 0.2, -4.5]], wall: [[-8.5, 1.7, -2.6], [-9, 1.5, -7]], wall2: [[6.5, 1.7, -2.6], [6.5, 1.5, -7]], facade: [[-6, 2.5, 4], [-10, 7, -16]], sign: [[0, 2.6, -1], [0, 3.4, -7]] };
+const setCam = (n) => { const c = cams[n] || cams.front; camera.position.fromArray(c[0]); camera.lookAt(new THREE.Vector3().fromArray(c[1])); };
+const apply = (o) => {
+  if (o.quality) ctx.settings.applyQuality(o.quality);
+  if (o.time !== undefined) env.setTime(Number(o.time), { instant: true });
+  if (o.weather) env.setWeather(o.weather, { instant: true });
+  if (o.wet !== undefined) env.setWetness(Number(o.wet));
+  if (o.night !== undefined) mats.setNightFactor(o.night === null ? null : Number(o.night));
+  if (o.cam) setCam(o.cam);
+};
+const settle = (n = 3) => new Promise((r) => { const goal = gfx.getInfo().frames + n; const t = setInterval(() => { if (gfx.unavailable || gfx.getInfo().frames >= goal) { clearInterval(t); r(gfx.getInfo()); } }, 50); });
+window.__h = { ctx, THREE, gfx, env, weather, mats, apply, setCam, settle, set: async (o, n = 3) => { apply(o); return settle(n); } };
+apply({ time: p.time === undefined ? 22.5 : p.time, weather: p.weather || 'rain', cam: p.cam || 'front', wet: p.wet, night: p.night });
+ctx.flow.setMode('world');
+ctx.loop.start();
+await settle(Number(p.frames) || 3);
+window.__ready = true;
+</script>
+</body>
+</html>

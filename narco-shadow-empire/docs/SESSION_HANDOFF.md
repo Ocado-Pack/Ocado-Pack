@@ -1,13 +1,14 @@
 # SESSION HANDOFF — NARCO: SHADOW EMPIRE (Operation Numbers)
 
-Snapshot: 2026-11-12, end of session 3 (rendering core) · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
+Snapshot: 2026-11-12, end of session 3 (rendering core + materials) · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
 (all paths below are relative to it). Read with `docs/NEXT_TASKS.md` and `docs/ARCHITECTURE.md`.
 
 > **Honest one-line status:** the learning core (question engine for 4 of 20 topics, learner profile, tutor hint ladder,
 > session report) and the **rendering core** (renderer with honest 4K modes, post chain, sky / time of day / fog, rain
-> and particles) are built and verified — 41 unit tests, 3 browser scenarios, self-test 11/11. **There is still no world,
-> no character control, no vehicle, no UI and no mission.** The game is not playable: the page boots both cores and
-> shows a status line; the 3D can only be seen in the harness `dev/render.html` on a test set of boxes.
+> and particles, procedural PBR material library) are built and verified — 46 unit tests, 4 browser scenarios,
+> self-test 11/11. **There is still no world, no character control, no vehicle, no UI and no mission.** The game is
+> not playable: the page boots both cores and shows a status line; the 3D can only be seen in the harness pages
+> `dev/render.html` (boxes) and `dev/materials.html` (a showroom street of facades, panels, neon and signs).
 
 ---
 
@@ -109,7 +110,7 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | System | Status | Files |
 |---|---|---|
 | Dev server, screenshot/E2E harness | **Done, verified** (page loads, WebGL2 via SwiftShader ~5 FPS) | `tools/serve.mjs`, `tools/lib/harness.cjs`, `tools/shot.cjs`, `tools/e2e.cjs` |
-| Single-file bundler | **Done, verified** with both cores (664 KB incl. three.js, loads from `file://`, zero requests, self-test 11/11 inside the bundle) | `tools/build.mjs`, `dist/narco-shadow-empire.html` |
+| Single-file bundler | **Done, verified** with both cores (682 KB incl. three.js, loads from `file://`, zero requests, self-test 11/11 inside the bundle) | `tools/build.mjs`, `dist/narco-shadow-empire.html` |
 | Core: context, events, rng, storage (memory fallback), settings + quality presets, i18n, flow, loop, util, ltext, params | **Done, verified** — 7/7 unit tests pass | `src/core/*.js`, `tests/unit/core.test.mjs` |
 | District layout + anchors/stations | **Done, verified** by tests (anchors inside their rooms) | `src/world/layout.js` |
 | Contracts document | **Done** | `docs/ARCHITECTURE.md` |
@@ -127,7 +128,8 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | Sky + time of day `ctx.env`: shader dome (gradient, clouds, sun, moon, stars, city glow), key light with texel-snapped shadows, hemisphere light, fog, exposure, bloom level, six weathers with transitions, wetness, lightning, reflection map | **Done, verified** — pure model unit-tested for every hour × weather; 20 screenshots looked at (night rain, storm flash, clear night sky, dawn fog, overcast and clear noon, morning shadows, dusk, sunset) | `src/world/{environment,skymodel}.js` |
 | Weather `ctx.weather`: 9000-streak GPU rain, ground splashes, pooled steam / smoke / dust / spray emitters, all lit by nearby lamps | **Done, verified** (counts follow the preset, smooth under gusts, emitters start/stop). **Gaps:** rain is not blocked by roofs (it only fades out by `ctx.zones.indoor`, which does not exist yet); dust and spray emitters run but were not looked at | `src/world/weather.js` |
 | Rendering harness + screenshot matrix | **Done** | `dev/render.html`, `dev/render.shots.cjs`, `tests/e2e/render.e2e.cjs` |
-| Materials + procedural textures, light pool | **Not implemented** (the harness has a 20-line sketch of the wet-ground shader) | planned `src/world/{textures,materials,lights}.js` |
+| Materials `ctx.mats`: 15 textured + 6 plain materials, paint / emissive / neon / glass, 5 facade styles with lit windows, canvas-text signs and labels, wetness (darkening, gloss, puddles) and night-only emissives | **Done, verified** — generator unit-tested (deterministic, seamless, ranges, speed); 7 showroom screenshots looked at (dry day, wet night, wall and ground close-ups); browser scenario with 6 checks. **Gaps:** no carpet / tile-floor / cardboard / water / car-paint materials yet (add when a builder needs them); CPU copies of the textures are kept (≈ 120 MB for the whole showroom on medium), which is what makes context-loss recovery work | `src/world/{texgen,textures,materials}.js`, `dev/materials.html` |
+| Light pool `ctx.lights` | **Not implemented** | planned `src/world/lights.js` |
 | City block, warehouse, pier, garage, hotel/ops room | **Not implemented** | planned `src/world/{world,city,warehouse,pier,garage,hotel}.js` |
 | Input, collision, player, camera, interact, zones, touch | **Not implemented** | planned `src/core/input.js`, `src/world/{collision,player,camera,interact,zones}.js`, `src/ui/touch.js` |
 | Vehicle + dashboard telemetry | **Not implemented** | planned `src/world/{vehicle,carmodel}.js` |
@@ -143,29 +145,32 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 
 ## 4. Current unfinished work (resume exactly here)
 
-**Nothing is half-done.** P0 tasks 1 (math engine), 2 (learner model) and 3 (rendering core) are complete, committed and
-pushed.
+**Nothing is half-done.** P0 tasks 1 (math engine), 2 (learner model), 3 (rendering core) and 4 (materials) are
+complete, committed and pushed.
 
-- **Last successful results:** `npm test` → 41 tests, 41 pass (7 core/layout, 9 math, 12 learning, 13 rendering);
-  `node --test .claude/hooks/context-guard.test.mjs` → 7/7; `npm run e2e` → 3/3 scenarios (learning on the dev page,
-  learning in the single-file build from `file://`, rendering core with 18 checks); `npm run build` → 664 KB.
+- **Last successful results:** `npm test` → 46 tests, 46 pass (7 core/layout, 9 math, 12 learning, 13 rendering,
+  5 texture generator); `node --test .claude/hooks/context-guard.test.mjs` → 7/7; `npm run e2e` → 4/4 scenarios
+  (learning on the dev page, learning in the single-file build from `file://`, rendering core with 18 checks,
+  materials with 6 checks); `npm run build` → 682 KB.
 - **Current errors:** none known. The only console noise is Chromium's "GPU stall due to ReadPixels" warning, which
   comes from software WebGL screenshots, not from the game.
 - **How the tests were checked:** ten deliberate one-line breaks in the rendering core (4K rule, fixed-4K sizing,
   back-off of the dynamic scaler, night ambient floor, sun-moon hand-over, fog colour, `is4K` taken from the mode name,
   rain drift, the `env:night` event, instant wetness). Eight failed the suite at once; two exposed gaps that were then
   closed (a scaler scenario that needs the back-off, and a portrait window in fixed-4K mode). All ten are caught now.
+  Five more breaks in the material library (noise wrap, normal direction, wetness uniform, night factor, wet
+  roughness) were all caught on the first run.
 
-**Exact next action — P0 task 4, materials** (`docs/NEXT_TASKS.md`; spec `B1B` in `docs/briefs/narco-world.workflow.js`):
-1. `src/world/textures.js`: seeded value-noise / fbm helpers on canvas `ImageData`, `makeMaps(kind, {size, seed})` →
-   `{map, normalMap (Sobel from a height field), roughnessMap}`, cached, size from `settings.textureSize`. Lean first
-   set: asphalt (+ puddle mask), sidewalk, concrete, brick, stucco, corrugated metal, crate wood, chain-link (alpha),
-   one facade atlas with lit windows, `textTexture` for signs and labels.
-2. `src/world/materials.js` → `ctx.mats` (`get`, `paint`, `neon` / `emissive`, `glass`, `sign` / `label`, `facade`).
-   Wettable materials follow `ctx.env.wetness` (move the sketch in `dev/render.html` → `wettable()` into the library:
-   darker albedo, lower roughness, puddles from the mask); night-only emissives follow `ctx.env.nightFactor`.
-3. Harness `dev/materials.html` (swatches on the render core); look at dry-day and wet-night screenshots.
-4. Then P0 tasks 5–13 in order. The first thing that needs `ctx.lights` is the city (task 6): decide there whether the
+**Exact next action — P0 task 5, actors core** (`docs/NEXT_TASKS.md`; spec in `docs/briefs/narco-actors.workflow.js`):
+1. `src/core/input.js` → `ctx.input` (ARCHITECTURE §6): keyboard + mouse look with pointer lock and a drag-look
+   fallback, the action list, `setVirtual` / `tap` for tests and touch, `endFrame`. Pure enough to unit-test the
+   action mapping in Node if DOM listeners are attached in a separate `attach()` step.
+2. `src/world/collision.js` → `ctx.collision`: AABB boxes in a spatial hash, `groundY`, `moveCapsule` with 0.4 m
+   step-up, `raycast`, `resolveBoxXZ` for the car. Keep it free of three.js so it is unit-tested in Node.
+3. `src/world/player.js`, `camera.js` (follow camera that never clips through walls), `interact.js`, `zones.js`
+   (`zones.indoor` is what makes the rain fade indoors), `character.js` (replace the capsule stub).
+4. Harness `dev/player.html` on the rendering core + `ctx.mats`, with a self-check driven by `ctx.loop.fastForward`.
+5. Then P0 tasks 6–13 in order. The first thing that needs `ctx.lights` is the city (task 6): decide there whether the
    lean demo gets the pooled light system or a fixed handful of real lights (`settings.maxLights`).
 
 **Things the next layers can rely on (all tested):**
@@ -182,6 +187,9 @@ pushed.
   `ctx.loop`; `ctx.env.setTime(22.5, {instant: true})` + `ctx.env.setWeather('rain', {instant: true})` give the opening
   look; `ctx.gfx.getInfo()` for the FPS / resolution readout (show "4K" only when `is4K`); `ctx.gfx.project()` for HUD
   markers; `ctx.weather.addEmitter()` for steam and smoke; `ctx.weather.setLights()` so rain glows near lamps.
+- Materials: `ctx.mats.get('asphalt')` etc. (list in ARCHITECTURE §5); UVs in metres divided by
+  `material.userData.meters`; `ctx.mats.facade(style, {seed})` for one-quad building faces; `ctx.mats.sign(text, opts)`
+  and `ctx.mats.label(text)` for in-world text (the mission numbers on placards and tags go through `label`).
 - Light levels that work with the exposure and bloom: street lamp ≈ 130 cd at 5.7 m, neon spill ≈ 20 cd, emissive
   intensity 5–7 for tubes and lamp heads. Three times that washed the frame out (seen in the first screenshots).
 - A custom `ShaderMaterial` must end with `#include <tonemapping_fragment>` + `#include <colorspace_fragment>`, or it
@@ -262,6 +270,11 @@ per NEXT_TASKS).
   - Rain is animated in the vertex shader from two wrapped clocks kept on the CPU (fall time, accumulated wind drift):
     the first version used `wind × time`, which would have teleported every streak on each gust.
   - Stars keep about one pixel of radius at any resolution (an energy-conserving version made them invisible below 4K).
+  - Textures are generated as typed arrays by a pure module (`texgen.js`) and uploaded as `DataTexture`s: testable in
+    Node, no canvas colour-management surprises, identical on every browser. Only sign text uses a canvas.
+  - Puddles come from world-space noise in the shader, not from the tiling texture, so they do not repeat every 4 m.
+  - Window glass in the facade atlas is kept perfectly flat in the height map: noise there turned the reflections into
+    white speckles. Glazed tile walls got the same treatment after they glittered under neon.
   - REJECTED: tying the 4K label to the resolution mode; an antialiased canvas (doubles memory at 4K next to the MSAA
     target); a second MSAA composer target; `drawDistance` as the camera far plane (pops in clear weather).
 

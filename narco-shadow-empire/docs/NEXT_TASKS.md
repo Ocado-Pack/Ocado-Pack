@@ -21,10 +21,10 @@ the demo target is roughly 7k lines in total.
    harness `dev/render.html` + `dev/render.shots.cjs`, `tests/unit/render.test.mjs` (13), `tests/e2e/render.e2e.cjs` (18
    checks), self-test extended to 11. Wired into `src/main.js`. Open items moved to P1: rain blocked by roofs, a frame-rate
    pass on a real GPU, a look at the dust / spray emitters and at AO.
-4. **Materials** *(next — start here)*: `src/world/textures.js` + `materials.js` — compact procedural set: wet asphalt, sidewalk,
-   concrete, brick, stucco facade atlas with lit windows, corrugated metal, crate wood, chain-link, glass,
-   neon/emissive, canvas-text signs and labels.
-5. **Actors core**: `src/core/input.js` (keyboard + mouse with pointer-lock and drag-look fallback, `setVirtual`
+4. **Materials** — **DONE (session 3).** `src/world/{texgen,textures,materials}.js` → `ctx.mats`, harness
+   `dev/materials.html`, `tests/unit/texgen.test.mjs` (5), `tests/e2e/materials.e2e.cjs` (6 checks). Add further materials
+   (tile floor, carpet, cardboard, water, car paint) when a builder needs them.
+5. **Actors core** *(next — start here)*: `src/core/input.js` (keyboard + mouse with pointer-lock and drag-look fallback, `setVirtual`
    for tests), `src/world/collision.js` (AABB spatial hash, capsule move with step-up, raycast, oriented-box
    resolve for the car), `player.js`, `camera.js` (follow with wall collision, vehicle chase, cinematic pose,
    focus), `interact.js`, `zones.js`, `character.js` (replace the stub with a procedural humanoid + walk/run/idle).

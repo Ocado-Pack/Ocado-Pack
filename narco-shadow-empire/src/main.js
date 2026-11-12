@@ -1,5 +1,5 @@
 // Boot. Wired so far: the learning core (question engine + learner model) and the rendering core (renderer, sky /
-// time of day / fog, rain and particles). The world, actors, UI and game layers are not built yet - the integration
+// time of day / fog, rain and particles, material library). The world, actors, UI and game layers are not built yet - the integration
 // step extends this file (see docs/ARCHITECTURE.md sections 3 and 9).
 import { createContext } from './core/context.js';
 import { flag } from './core/params.js';
@@ -8,6 +8,7 @@ import { createLearning } from './learning/index.js';
 import { createRenderer } from './world/renderer.js';
 import { createEnvironment } from './world/environment.js';
 import { createWeather } from './world/weather.js';
+import { createMaterials } from './world/materials.js';
 import { runSelfTest } from './game/selftest.js';
 
 const ctx = createContext();
@@ -17,6 +18,7 @@ createLearning(ctx);
 if (flag(ctx.params, 'norender')) ctx.loop.renderEnabled = false; else createRenderer(ctx);
 createEnvironment(ctx, { hour: 22.5, weather: 'rain' });      // the opening scene: night, rain, wet streets
 createWeather(ctx);
+createMaterials(ctx);                                          // textures are generated lazily, on first use
 /** window.__game.selfTest() -> {pass, passed, total, results} (learning checks run in a sandbox; never touches the saved profile) */
 ctx.selfTest = () => runSelfTest(ctx);
 // The loop is not started yet: there is no world to show. Frames are drawn on demand (ctx.loop.renderOnce, gfx.sample).
