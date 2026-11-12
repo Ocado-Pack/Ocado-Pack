@@ -247,6 +247,7 @@ export function createTopicStats(section) {
 export function applyOutcome(stats, result, now) {
   const o = result.outcome;
   if (o === 'skipped') { stats.skipped += 1; return stats; }
+  if (!OUTCOME_CODE[o]) return stats;                    // not an outcome: nothing to fold in
   stats.attempts += 1;
   stats[o] += 1;
   stats.lastSeen = now;

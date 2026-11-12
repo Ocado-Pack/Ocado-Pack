@@ -121,6 +121,8 @@ freeCursor})`. Gameplay code checks `ctx.flow.worldInput`; the sim stops when `c
 | `tutor:hint` | `{questionId, level, kind}` |
 | `learning:recorded` | `{result, xp, levelChange}` (after `profile.record`) |
 | `learning:level` | `{topic, from, to}` |
+| `learning:reset` / `learning:aid` | `{imported}` (profile reset or imported) / `{aid:'calculator'}` (emitted by the phone calculator) |
+| `session:phase` / `session:end` | `{phase, missionId}` / `{report}` |
 | `exam:start` / `exam:section` / `exam:finish` | `{config}` / `{report}` / `{report}` |
 | `dialog:line` / `dialog:end` | `{speaker, text}` / `{}` |
 | `cinematic:start` / `cinematic:end` | `{id}` |
@@ -337,10 +339,15 @@ Question = {
   formula: LText, trick?: LText,       // rule/formula; optional memory trick ("DIRT: Distance = Rate × Time")
   visual: { type:'fraction'|'percent'|'balance'|'geometry'|'route'|'bars'|'numberline'|'none', params:{…} },
   rookie?: { lines: LText[], wrongIndex: number, why: LText },   // flawed worked solution ("check the rookie's work")
+  misconceptions: [ {value:number, tag:string, why: LText} ],    // EVERY named mistake of the template (superset of the wrong choices)
   estSeconds: number
 }
 ```
 Wrong choices come from **named misconceptions** (`tag` + `why`), so the tutor can say *why* an answer is wrong.
+`misconceptions` keeps all of them, so a **typed** wrong answer is explained even when it is not one of the four
+choices (3 + 18 − 14 = 7, x = 23/3 …). A whole-number answer is only shown next to whole-number choices; generic
+`near` fillers are a last resort (the test sweep fails above 5 %). A question is plain JSON: it survives a save/load
+round trip, and `{templateId, level, seed}` alone rebuilds it. How to write a template: `src/math/README.md`.
 
 ### 7.2 Topics (ids are fixed)
 AR: `ar.word` word problems · `ar.ops` + − × ÷ · `ar.fracdec` fractions & decimals · `ar.percent` percent & discounts ·
@@ -357,11 +364,15 @@ Levels: 1 Recruit · 2 Specialist · 3 Operator · 4 Advanced Operator · 5 ASVA
 math.topics → [{id, section, name: LText, short: LText, blurb: LText}]            // 20 topics
 math.templates → Map(id → template)   // template = {id, section, topic, levels:[…], params(rng, level, opts) , build(params) , check?(params)}
 math.generate({templateId?, topic?, section?, level?, seed?, avoid?:Set|string[], theme?}) → Question   // validated; never returns an invalid item
-math.build(templateId, params) → Question          // deterministic from explicit params (story-specific numbers)
+      // with an explicit seed the result is reproducible (only `avoid` can change it); without one the engine
+      // also avoids its own ring of ~200 recent signatures
+math.build(templateId, params, level?) → Question  // deterministic from explicit params (story-specific numbers); throws on params it cannot present
 math.similar(q) → Question                         // same template + level, different numbers (≠ signature)
 math.easier(q) → Question                          // same topic, one level down (same template when possible)
-math.check(q, input) → {correct, value?, normalized, choice?: Choice, why?: LText, parseError?: LText}
-      // input: {choice: index} | {text: '40'}  — accepts 40, 40.0, 1/2, 1 1/2, -3, 25%, $1,200.50, units ignored
+math.check(q, input) → {correct, value?, normalized, choice?: Choice, tag?: string, why?: LText, parseError?: LText}
+      // input: {choice: index} | {text: '40'}  — accepts 40, 40.0, 1/2, 1 1/2, -3, 25%, $1,200.50, 'x = 9', units ignored;
+      // expressions ('54 - 14', '3 x 18') are a parseError, which callers must NOT count as an attempt.
+      // tag + why name the mistake behind a wrong value (looked up in q.misconceptions)
 math.validate(q) → {ok, errors: string[]}
 math.fixed.trucks() → Question      // "Three trucks carry 18 equipment cases each. Fourteen cases are removed. How many remain?" → 40
 math.fixed.equation() → Question    // "Solve 3(x − 2) = 21." → x = 9
@@ -371,7 +382,8 @@ non-empty, 3 hints, ≥ 3 solution steps, finite numbers, answer re-derived by a
 no answer leak in `beginner`/`hints[0..1]`. Unit tests sweep every template × level × many seeds.
 
 `src/math/linear.js` models one-variable linear equations for the balance puzzle:
-`createLinear({lhs:{x, c, mult?}, rhs:{x, c}})` → `{apply(op:'add'|'sub'|'mul'|'div'|'expand', value?) → {ok, state, text, error?}, isSolved(), solution(), text(), history}`.
+`createLinear({lhs:{x, c, mult?, inner?}, rhs:{x, c}})` → `{apply(op:'add'|'sub'|'mul'|'div'|'expand', value?) → {ok, state, text, solved?, error?}, undo(), reset(), isSolved(), solution(), text(), state(), history}`.
+`value` is a number, a fraction string (`'3/4'`) or `{x: k}` (add/subtract k·x). Illegal moves return `ok:false` with a bilingual `error` and change nothing.
 
 ### 7.4 `ctx.profile` — learner model (`src/learning/profile.js` …)
 ```js
@@ -381,7 +393,9 @@ QuestionResult = { questionId, templateId, topic, section, level, signature,
   attempts, hintLevel (0–4), aids: {beginner?, formula?, similar?, visual?, why?, calculator?},
   timeMs, wrong: [{value, tag}], ts }
 
-profile.record(result) → {xp, levelChange?: {topic, from, to}, srs: {box, dueAt, dueMission}}     // THE entry point
+profile.record(result) → {xp, levelChange?: {topic, from, to}, srs: {box, dueAt, dueMission}, result} | null   // THE entry point
+      // `result` is the stored copy with the credit rule ENFORCED (a result that claims 'independent' with a hint, an aid or a
+      // second attempt is stored as 'assisted'; hint level 4 is always 'revealed'); null for a malformed result
 profile.data                         // persisted plain object (versioned); profile.save() · profile.load()
 profile.topic(topicId) → {attempts, independent, assisted, revealed, independentPct, avgTimeMs, level, mastery (0–1), state, due}
 profile.section('AR'|'MK') → {answered, independent, independentPct, avgTimeMs} · profile.overall()
@@ -395,6 +409,10 @@ profile.xp · profile.missionDone(id, report) · profile.missionState(id) · pro
 profile.addExam(report) · profile.exams · profile.recentSignatures() → Set
 profile.export() → string · profile.import(json) → boolean · profile.reset()
 ```
+`recommend()` order: 3+ topics due → review · next mission (`ctx.campaign.next()`) · practice exam (30+ answers, none in 3 days) ·
+any topic due → review · weakest practised topic → drill. Saves are synchronous (no debounce). Events: `learning:recorded`,
+`learning:level`, `learning:reset {imported}`.
+
 **Credit rules.** `independent` = correct on the first attempt with no hint/aid → full mastery credit + full XP.
 `assisted` = correct after a wrong attempt or any hint/aid → completion + reduced XP, no independent credit.
 `revealed` = the full solution was shown → **zero mastery credit**, topic scheduled for early review.
@@ -412,9 +430,16 @@ t.submit(input) → { correct, feedback: LText, why?: LText,                    
                     followUp?: Question }                                         // wrong #4 → full solution + a related problem
 t.request(kind) → {title: LText, body: LText, example?: {question, solution}, visual?: Visual}
       // kind: 'beginner' | 'formula' | 'why' | 'similar' | 'visual' | 'retry' | 'language'
-t.outcome() → 'independent'|'assisted'|'revealed' · t.hintLevel · t.attempts · t.revealed
-t.finish() → QuestionResult                      // records into ctx.profile exactly once
+t.outcome() → 'independent'|'assisted'|'revealed'|'incorrect'|'skipped' · t.hintLevel · t.attempts · t.revealed · t.wrong · t.aids
+t.finish() → QuestionResult (+ xp, levelChange?, needsReview)   // records into ctx.profile and the running ctx.session exactly once
+t.canAdvance · t.needsReview · t.followUp · t.beginFollowUp() → TutorSession|null · tutor.active · tutor.nextAfterReveal(t)
 ```
+Details that the puzzle UI relies on: a parse error is not an attempt; each wrong answer climbs ONE rung from where the
+learner already is (after the `formula` aid the next wrong answer shows hint 3); `beginner`/`visual` cost rung 1,
+`formula`/`similar` rung 2, `why`/`retry`/`language` are free, and help taken after the problem is solved is free;
+the event `learning:aid {aid:'calculator'}` while a problem is open costs independent credit. With `mode:'exam'` every
+request is denied and wrong answers give no hint. `t.canAdvance` is the gate: true once the problem — or a follow-up in
+its chain — was solved without a reveal (an assisted solve counts), or when the chain ran out.
 After a reveal the learner must solve the **related problem** independently to advance (max 2 follow-ups, the second one
 level easier; then the gate opens flagged "needs review" — never a dead end, never mastery credit).
 
@@ -422,8 +447,9 @@ level easier; then the gate opens flagged "needs review" — never a dead end, n
 Phases: `story` 0–2 min · `ar` 2–5 · `mk` 5–8 · `combined` 8–12 · `debrief` 12–15 (scaled for 30/45-minute sessions).
 ```js
 session.start({missionId, minutes}) · session.setPhase(id) · session.phase · session.plan · session.elapsedMs
-session.add(result) · session.results · session.end() → SessionReport
-SessionReport = {missionId, durationMs, results, byTopic, strengths:[topicId], weaknesses:[topicId], xp,
+session.add(result, question?) · session.results · session.end() → SessionReport · session.report · session.active
+session.timePhase (what the clock says) · session.remainingMs · session.pause() · session.resume() · session.extend(minutes) · session.question(id)
+SessionReport = {missionId, durationMs, minutes, results, byTopic, counts, answered, independentPct, strengths:[topicId], weaknesses:[topicId], xp,
                  mistakes:[{question, yourAnswers, why, solution}], reviewQuestions: Question[3–5]  /* cold recall quiz */ }
 ```
 

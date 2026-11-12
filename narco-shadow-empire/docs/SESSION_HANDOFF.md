@@ -1,11 +1,11 @@
 # SESSION HANDOFF — NARCO: SHADOW EMPIRE (Operation Numbers)
 
-Snapshot: 2026-11-12 ~07:55 UTC · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
+Snapshot: 2026-11-12, end of session 2 · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
 (all paths below are relative to it). Read with `docs/NEXT_TASKS.md` and `docs/ARCHITECTURE.md`.
 
-> **Honest one-line status:** the foundation (tooling, core, layout, contracts) is built and verified; the math
-> engine is written but **has never been run and currently fails to import**; **no 3D, gameplay or UI code exists
-> yet**. The game is not playable.
+> **Honest one-line status:** the learning core is built and verified (question engine for 4 of 20 topics, learner
+> profile, tutor hint ladder, session report — 28 unit tests, 2 browser scenarios, both demo problems give 40 and
+> x = 9); **no 3D, gameplay or UI code exists yet**. The game is not playable: the page only boots the learning core.
 
 ---
 
@@ -78,8 +78,8 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 - **Stack**: browser, three.js **r160** vendored (`vendor/three/three.module.js` + `vendor/three/addons/*`), plain
   ES modules, no build step in dev; `esbuild` (only dev dependency) bundles to one offline file.
 - **Entry points**: `index.html` (dev; import map + stylesheet list + `<canvas id="game">` + `<div id="ui">`) →
-  `src/main.js` (currently a placeholder that only creates the context). Build output:
-  `dist/narco-shadow-empire.html`.
+  `src/main.js` (creates the context, registers `ctx.math`, `ctx.profile`, `ctx.session`, `ctx.tutor` and
+  `ctx.selfTest`; everything else is still a null object). Build output: `dist/narco-shadow-empire.html`.
 - **Context pattern**: `createContext()` (`src/core/context.js`) → `ctx` with events, settings, storage, i18n,
   flow, loop, rng, time; systems are factories `createXxx(ctx)` that `ctx.register(name, system, {order,
   runWhenPaused})`; unregistered systems are deep null objects. Simulation (`loop.step` / `loop.fastForward`) is
@@ -107,17 +107,19 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | System | Status | Files |
 |---|---|---|
 | Dev server, screenshot/E2E harness | **Done, verified** (page loads, WebGL2 via SwiftShader ~5 FPS) | `tools/serve.mjs`, `tools/lib/harness.cjs`, `tools/shot.cjs`, `tools/e2e.cjs` |
-| Single-file bundler | **Done, verified** on the placeholder (loads from `file://`, zero requests) | `tools/build.mjs`, `dist/narco-shadow-empire.html` (placeholder build) |
+| Single-file bundler | **Done, verified** with the learning core (120 KB, loads from `file://`, zero requests) | `tools/build.mjs`, `dist/narco-shadow-empire.html` (learning core only) |
 | Core: context, events, rng, storage (memory fallback), settings + quality presets, i18n, flow, loop, util, ltext, params | **Done, verified** — 7/7 unit tests pass | `src/core/*.js`, `tests/unit/core.test.mjs` |
 | District layout + anchors/stations | **Done, verified** by tests (anchors inside their rooms) | `src/world/layout.js` |
 | Contracts document | **Done** | `docs/ARCHITECTURE.md` |
 | UI design tokens | **Done** (tokens only, no components) | `src/styles/base.css`; other `src/styles/*.css` are empty placeholders |
-| Learner model: credit/XP/mastery, adaptive levels, spaced repetition | **Partial** — written by a sub-agent, reads correctly, **untested** | `src/learning/mastery.js`, `adaptive.js`, `srs.js` |
-| Learner model: profile, tutor ladder, session, exam logic, recommend, explain-it | **Not implemented** | planned: `src/learning/{index,profile,tutor,session,exam,recommend,explain}.js` |
-| Math engine: kit (rationals, formatting, answers, assembly, validation, parsing), engine, linear step-model, topics | **Written, NEVER RUN** | `src/math/kit.js`, `engine.js`, `linear.js`, `topics.js` |
-| Topic packs: ar.ops (5 templates), ar.word (2), mk.linear (4), mk.order (2) | **Written, NEVER RUN** | `src/math/templates/ar/{ops,word}.js`, `src/math/templates/mk/{linear,order}.js` |
-| Math registry + tests + README | **Missing → engine import is BROKEN** | `src/math/registry.js`, `tests/unit/math.test.mjs`, `src/math/README.md` |
-| Other 16 topic packs | **Not implemented** | — |
+| Math engine: kit (rationals, formatting, answer types, assembly, validation, parsing, checking), engine, registry, linear step model, topics | **Done, verified** — sweep of every template × level × 300 seeds on the raw no-retry path: 0 invalid | `src/math/{kit,engine,registry,linear,topics}.js`, `src/math/README.md`, `tests/unit/math.test.mjs` |
+| Topic packs: ar.ops (5 templates, levels 1–5), ar.word (2, levels 1–4), mk.linear (4, levels 1–5), mk.order (2, levels 1–5) | **Done, verified** (EN + ES read through by hand once) | `src/math/templates/ar/{ops,word}.js`, `src/math/templates/mk/{linear,order}.js` |
+| Other 16 topic packs | **Not implemented** (`math.generate({topic})` throws "no templates for …") | — |
+| Learner model rules: credit / XP / mastery, adaptive levels, spaced repetition | **Done, verified** | `src/learning/{mastery,adaptive,srs}.js` |
+| Learner model: persistent profile, tutor hint ladder + follow-up gate, session director + after-action report | **Done, verified** (injected clock, real engine, throwing storage) | `src/learning/{profile,tutor,session,index}.js`, `tests/unit/learning.test.mjs` |
+| Learner model: exam logic, explain-it coach | **Not implemented** (P1; `ctx.exam` is a null object) | planned `src/learning/{exam,explain}.js` |
+| Live self-test (learning core only, sandboxed) | **Done, verified** in Node and in the browser — 8/8 | `src/game/selftest.js` → `window.__game.selfTest()` |
+| Browser proof of the learning core | **Done, verified** — dev page and single-file build from `file://`: self-test, both demo problems through `ctx.tutor`, progress survives a reload, 0 console errors, 0 external requests | `tests/e2e/{_learning,learning.e2e,learning-dist.e2e}.cjs` |
 | Character model | **Stub only** (capsule with the final interface) | `src/world/character.js` |
 | Renderer / post / 4K resolution modes, sky, day-night, fog, rain, materials, lights | **Not implemented** | planned `src/world/{renderer,post,environment,weather,textures,materials,lights}.js` |
 | City block, warehouse, pier, garage, hotel/ops room | **Not implemented** | planned `src/world/{world,city,warehouse,pier,garage,hotel}.js` |
@@ -126,44 +128,46 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | NPCs, traffic, pedestrians | **Not implemented** | — |
 | UI: HUD, dialog/subtitles, documents, menus, pause, settings, phone, map | **Not implemented** | planned `src/ui/*`, `src/game/dialog.js` |
 | Puzzle panel + tutor UI, debrief, dashboard, drills, exam UI, visual lab | **Not implemented** | planned `src/ui/*` |
-| Missions, campaign, cinematics, save/load, app controller, selfTest | **Not implemented** | planned `src/game/*` |
+| Missions, campaign, cinematics, save/load, app controller | **Not implemented** | planned `src/game/*` |
 | Audio | **Not implemented** | planned `src/core/audio.js` |
-| Boot wiring | **Placeholder** (creates ctx, sets `window.__ready`) | `src/main.js` |
+| Boot wiring | **Partial** — learning core only (ctx, math, profile, session, tutor, selfTest); no renderer, world, UI or missions | `src/main.js` |
 
 ---
 
 ## 4. Current unfinished work (resume exactly here)
 
-**Task in progress:** finishing the math engine for the first playable demo.
+**Nothing is half-done.** P0 tasks 1 (math engine) and 2 (learner model) are complete, committed and pushed.
 
-- Files just written and not yet executed: `src/math/kit.js`, `engine.js`, `linear.js`, `topics.js`,
-  `templates/ar/ops.js`, `templates/ar/word.js`, `templates/mk/linear.js`, `templates/mk/order.js`.
-- **Current error:** `node -e "import('./src/math/engine.js')"` → `ERR_MODULE_NOT_FOUND … src/math/registry.js`.
-- **Last successful result:** `npm test` → 7 tests, 7 pass (core + layout only; nothing imports the math yet).
+- **Last successful results:** `npm test` → 28 tests, 28 pass (7 core/layout, 9 math, 12 learning);
+  `npm run e2e` → 2/2 scenarios pass; `npm run build` → `dist/narco-shadow-empire.html` (120 KB).
+- **Current errors:** none known.
+- **How the tests were checked:** 14 deliberate one-line breaks (credit rule, reveal gate, SRS delay, leak check,
+  independent check, displayed equation …) were applied one at a time; the suite failed for all 14 after one gap
+  was closed (the recall quiz repeating a seen question now has its own test).
 
-**Exact next action**
-1. Create `src/math/registry.js` — side-effect imports of the four existing packs:
-   `import './templates/ar/ops.js'; import './templates/ar/word.js'; import './templates/mk/linear.js';
-   import './templates/mk/order.js';` (each pack calls `defineTemplate`, which fills the kit's template map).
-2. Write `tests/unit/math.test.mjs` and run it: exact text + answers of `math.fixed.trucks()` (40) and
-   `math.fixed.equation()` (x = 9); a sweep of every template × supported level × ~300 seeds through
-   `math.validate`; `parseAnswer` table; `checkAnswer` (accepts `40`, `40 cases`, `x = 9`; wrong value returns the
-   matching misconception `why`); determinism per seed; `similar` / `easier`; `createLinear` both routes for
-   3(x − 2) = 21 (`div 3, add 2` and `expand, add 6, div 3`), illegal moves, undo.
-3. Fix what the sweep finds. **Known suspects in the unrun code:**
-   - `mk.linear.twostep` builds `rookie.lines` with `.slice(0, p.b > 0 ? 4 : 0)` → an empty `lines` array when
-     `b ≤ 0`, which `validateQuestion` rejects ("bad rookie block"). Set `rookie` to `undefined` when `b ≤ 0`, and
-     replace the placeholder last line `x = …` with the real (wrong) value.
-   - `mk.linear.distribute` rookie's last line is also the placeholder `x = …`.
-   - Wrong-answer lists are filtered to integers/half/quarter values; the kit tops up to 3 with near-miss fillers —
-     confirm every template always yields 4 distinct choices.
-   - The leak check in `validateQuestion` (answer token must not appear in `beginner`, `hints[0]`, `hints[1]`
-     unless it is in the prompt/expr) may reject some parameter sets; `generate` retries up to 60 times — confirm
-     no template exhausts its retries.
-   - `ans.frac`/`ans.money` formatting paths and `kit.t()` placeholder substitution are untested.
-4. Then continue down `docs/NEXT_TASKS.md` (learner model → 3D core → UI → mission → integration).
+**Exact next action — P0 task 3, rendering core** (`docs/NEXT_TASKS.md`; spec in `docs/briefs/narco-world.workflow.js`):
+1. `src/world/renderer.js` → `ctx.gfx` (ARCHITECTURE §5): WebGLRenderer on `<canvas id="game">`, ACES tone mapping, sRGB
+   output, shadows, pixel-ratio / render-scale / fixed-4K modes driven by `ctx.settings` quality presets, an honest
+   `getInfo()` (real drawing-buffer size), `render(dt)` called by the loop. Bloom/grade (`post.js`) can follow.
+2. `src/world/environment.js` (sky dome, moon, hemisphere + directional light, fog, time of day, wetness) and
+   `src/world/weather.js` (camera-following rain).
+3. Harness `dev/render.html` (copy `dev/_template.html`); look at night-rain and day screenshots with
+   `node tools/shot.cjs "dev/render.html?quality=low" --w 640 --h 360 --out <png>`.
+4. Register the renderer in `src/main.js`, extend `src/game/selftest.js` with a renderer check, then continue with
+   P0 tasks 4–13 in order.
 
-**Tests still to run:** everything under math and learning; no visual or gameplay test exists yet.
+**Things the next layers can rely on (all tested):**
+- `ctx.math.fixed.trucks()` / `.equation()`; `ctx.math.check(q, {text})` → `{correct, tag, why, parseError}`;
+  a `parseError` must not be counted as an attempt (the tutor already handles this).
+- `const t = ctx.tutor.begin(question, {mode})` → `t.submit({text|choice})`, `t.request(kind)`, `t.finish()`,
+  `t.canAdvance` (the gate), `t.beginFollowUp()`; the puzzle panel only has to render what these return.
+- `ctx.session.start({missionId})` … `ctx.session.end()` → the after-action report (`mistakes`, `reviewQuestions`,
+  `byTopic`, `strengths`, `weaknesses`, `xp`); `ctx.profile.missionDone(id, report)` unlocks "due after next mission".
+- `ctx.profile` getters for the dashboard: `section('AR'|'MK')`, `overall()`, `topic(id)`, `skillMap()`, `tier()`,
+  `streak()`, `due()`, `mistakes()`, `recommend()`.
+- `createLinear(question.visual.params)` for the balance puzzle of 3(x − 2) = 21 (both routes verified).
+
+**Tests still to write as the code appears:** everything visual and gameplay (screenshots + E2E per NEXT_TASKS).
 
 ---
 
@@ -201,6 +205,25 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
   +1 day, successes space out 1 → 3 → 7 → 14 → 30 days.
 - **Question design rule**: wrong choices come from named misconceptions (`tag` + bilingual `why`) so the tutor
   can explain *why* an answer is wrong; every template has an independent `check()`.
+- **Decisions of session 2 (math + learner model)**
+  - Every named mistake is stored on the question (`misconceptions`), not only the three shown as choices: the demo
+    is typed-entry, so typing 7 (3 + 18 − 14) or 23/3 (3x − 2 = 21) must still be explained.
+  - Template parameters are chosen so that the answer and every listed mistake are sensible values (e.g. fewer than
+    one truckload is removed). A mistake whose explanation would be untrue for the numbers is left out (`null`).
+    Generic `near` fillers remain only as a last resort; the sweep fails above 5 % per template/level.
+  - A whole-number answer is shown only next to whole-number choices (fraction mistakes are diagnose-only).
+  - The validator's leak rule is lexical, so `beginner`, hint 1 and hint 2 must not contain stray numerals
+    ("Route 1 / Route 2" was a real failure).
+  - `build()` throws on parameters it cannot present (it used to rewrite them silently).
+  - An explicit seed makes `generate` reproducible; `{templateId, level, seed}` is all a save file needs.
+  - `profile.record()` enforces the credit rule itself, so no caller can store credit that was not earned.
+  - Follow-up gate after a reveal: a related problem solved **without a reveal** opens it (an assisted solve
+    counts); after two revealed follow-ups it opens flagged `needsReview`. Stricter ("independent only") was
+    rejected as a possible dead end for a struggling learner.
+  - Profile saves are synchronous on every record (no debounce): simpler, and nothing is lost on tab close.
+  - `recommend()` order differs slightly from the brief (exam before single due topic / drill) because the brief's
+    order made the exam recommendation unreachable.
+  - The self-test runs in a sandbox with its own in-memory storage, so it can never alter the saved profile.
 
 ---
 
@@ -209,5 +232,6 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 - Node 22, npm 10, 4 CPUs, Chromium at `/opt/pw-browsers`. `npm install` in `narco-shadow-empire/` restores
   esbuild (node_modules is git-ignored).
 - The session scratchpad and `~/.claude` workflow files are **not** persistent — everything needed is in the repo.
+- `node --test tests/unit/` (a directory) fails with MODULE_NOT_FOUND on Node 22 — use `npm test` or name the files.
 - Git: commit on `claude/narco-shadow-empire-asvab-erthmj`, push with `git push -u origin <branch>`; no PR unless
   the user asks.

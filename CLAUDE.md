@@ -17,7 +17,7 @@ call → drive to the warehouse → AR problem "3 trucks × 18 cases − 14 = 40
 
 ## Commands (run inside `narco-shadow-empire/`)
 - `npm install` (dev-only dependency: esbuild) · `npm run dev` → http://localhost:8080
-- `npm test` → `node --test "tests/unit/**/*.test.mjs"`
+- `npm test` → `node --test "tests/unit/**/*.test.mjs"` (never pass a bare directory to `node --test`)
 - `node tools/shot.cjs "<page>?quality=low" --out <png> [--eval "js"] [--scenario f.cjs]` → headless Chromium
   screenshot + console/page-error report (software WebGL, a few FPS; use small viewports)
 - `npm run e2e` → scenarios in `tests/e2e/*.e2e.cjs` · `npm run build` → `dist/narco-shadow-empire.html`

@@ -11,19 +11,13 @@ the demo target is roughly 7k lines in total.
 
 ## P0 — first playable demo (in this order)
 
-1. **Math engine: make it run** *(in progress — code written, never executed)*
-   - Create `src/math/registry.js`; write `tests/unit/math.test.mjs`; fix failures (suspects listed in
-     `SESSION_HANDOFF.md` §4). Done when: fixed problems give 40 and x = 9 with the exact prompt text, and a
-     300-seed sweep of every template/level validates.
-2. **Learner model** on top of the existing `src/learning/{mastery,adaptive,srs}.js`
-   - `profile.js` (persisted under storage key `profile`; `record(result)` is the single entry point; topic /
-     section / overall stats, tier, due queue, mistakes, streak, skill map, xp, missionDone, export/import/reset),
-     `tutor.js` (ladder: wrong 1 → hint 1, 2 → hint 2, 3 → hint 3, 4 → reveal + related problem; requests
-     beginner / formula / why / similar / visual / retry / language; `finish()` records once),
-     `session.js` (phases story / ar / mk / combined / debrief; `end()` → report with mistakes + 3–5 review
-     questions), `index.js` (`createLearning(ctx, {now})`), tests with an injected clock.
-   - Exam logic (`exam.js`), `recommend.js`, `explain.js` can wait for P1 but keep the API of ARCHITECTURE §7.
-3. **Rendering core**: `src/world/renderer.js` (ctx.gfx: ACES, sRGB, shadows, EffectComposer bloom + grade,
+1. **Math engine: make it run** — **DONE (session 2).** `registry.js`, `tests/unit/math.test.mjs`, `src/math/README.md`;
+   fixed problems give 40 and x = 9 with the exact prompt text; every template × level × 300 seeds validates on the
+   raw path with no retries.
+2. **Learner model** — **DONE (session 2).** `profile.js`, `tutor.js`, `session.js`, `index.js`
+   (`createLearning(ctx, {now})`), `tests/unit/learning.test.mjs`; plus `src/game/selftest.js` and two browser
+   scenarios in `tests/e2e/`. Still open and deferred to P1: `exam.js`, `explain.js`.
+3. **Rendering core** *(next — start here)*: `src/world/renderer.js` (ctx.gfx: ACES, sRGB, shadows, EffectComposer bloom + grade,
    pixel-ratio / render-scale / fixed-4K / dynamic modes, honest `getInfo()`), `environment.js` (sky dome, moon/sun,
    hemisphere light, fog, time of day, wetness), `weather.js` (camera-following rain streaks + splashes). Harness
    `dev/render.html`; look at night-rain and day screenshots.
@@ -80,7 +74,8 @@ the demo target is roughly 7k lines in total.
 - Phone + district map, settings screens (graphics incl. resolution modes, audio, controls, accessibility,
   learning, data export/import), touch controls.
 - Visual lab manipulatives (fraction, percent, balance, geometry, route, bars, number line).
-- `window.__game.selfTest()` covering the acceptance list; README for the game folder.
+- Extend `window.__game.selfTest()` (`src/game/selftest.js`, learning core only today) to the whole acceptance list;
+  README for the game folder.
 - Day/night transitions per mission, smoke/dust/steam emitters, light pool for many lamps.
 
 ## P2 — polish and expansion
