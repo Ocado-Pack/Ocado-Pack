@@ -266,13 +266,14 @@ export class Warehouse {
     const frame = new THREE.MeshStandardMaterial({ color: '#39424a' });
     const wE = new THREE.Mesh(new THREE.BoxGeometry(0.08, 3, 16), glass); wE.position.set(-33.6, 1.5, 16.2); s.add(wE);
     const wS = new THREE.Mesh(new THREE.BoxGeometry(11, 3, 0.08), glass); wS.position.set(-39, 1.5, 8.1); s.add(wS);
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(11, 0.15, 16.4), frame); roof.position.set(-39, 3.05, 16.2); s.add(roof);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(11, 0.15, 16.4), new THREE.MeshStandardMaterial({ color: '#39424a', transparent: true, opacity: 0.18, depthWrite: false })); roof.position.set(-39, 3.05, 16.2); s.add(roof);
+    const chairs = new THREE.MeshStandardMaterial({ color: '#2d3640' }); for (const x of [-41, -37]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.9, 0.6), chairs); ch.position.set(x, 0.45, 15.4); s.add(ch); }
     const desk = new THREE.Mesh(new THREE.BoxGeometry(6, 0.75, 1.2), new THREE.MeshStandardMaterial({ color: '#4c5560' })); desk.position.set(-39, 0.38, 14); s.add(desk);
     this.dashTex = canvasTex(1024, 576, (g) => { g.fillStyle = '#0d1b26'; g.fillRect(0, 0, 1024, 576); });
     const scr = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 2.36), new THREE.MeshBasicMaterial({ map: this.dashTex })); scr.position.set(-39, 2.0, 12.3); scr.rotation.y = Math.PI; s.add(scr);
     const scr2 = scr.clone(); scr2.position.set(-39, 2.0, 15.0); scr2.rotation.y = 0; s.add(scr2);
     const grp = new THREE.Group(); grp.userData.pick = { type: 'control', id: 'control-room' }; grp.add(scr.clone()); s.add(grp);
-    this._addLabel({ type: 'fixed', id: 'control', text: '🖥 Control room — fleet dashboards (simulated)', pos: new THREE.Vector3(-39, 3.6, 16) });
+    this._addLabel({ type: 'fixed', id: 'control', text: '🖥 Control room & interview room (simulated)', pos: new THREE.Vector3(-39, 3.6, 16) });
     this._addLabel({ type: 'fixed', id: 'maint', text: '🔧 Maintenance bay', pos: new THREE.Vector3(-37, 2.4, -8.5) });
   }
   _buildAPs() {

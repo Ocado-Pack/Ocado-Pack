@@ -327,6 +327,16 @@ export class Sim {
         }
       }
     }
+    // robot abandoned its task during a long link loss → requeue (same idempotency key)
+    for (const r of s.robots) {
+      const a = s.fm.assignments[r.id];
+      if (a && r._abortedTask === a.taskId && !r.taskId && this.connected(r) && s.fm.reachable[r.id]) {
+        const tk = s.tasks[a.taskId]; delete s.fm.assignments[r.id]; r._abortedTask = null;
+        if (tk && !['completed', 'failed'].includes(tk.state)) { tk.robot = null; tk.excluded[r.id] = s.t + 20; this._th(tk, 'ready', `abandoned by ${r.id} after link loss; requeued`); }
+        s.counters.aborted++; this.win('task_aborted', { robot: r.id, zone: zoneOf(r.x, r.z), code: 'TASK_ABORTED_COMMS' });
+        this.log('WARN', 'fleet-manager', 'TASK_ABANDONED_BY_ROBOT', `${r.id} abandoned ${a.taskId} after a link loss; requeued with same idempotency key`, { robot: r.id, task: a.taskId, order: tk?.orderId, corr: tk?.corr });
+      }
+    }
     // orphan execution guard (robot executing a task FM did not assign to it)
     for (const r of s.robots) {
       if (r.taskId && this.connected(r) && s.fm.reachable[r.id]) {
@@ -492,11 +502,12 @@ export class Sim {
       s.aps[apId].clients++;
       let p = 0;
       const f = s.faults.apDegraded;
-      if (f && f.ap === apId) p = f.lossProb;
+      if (f && f.ap === apId && (f.zMin == null || r.z >= f.zMin)) p = f.lossProb;
       const fw = s.faults.firmwareWifi;
       if (fw && r.firmware === fw.firmware) p = Math.max(p, fw.lossProb);
       const wasConn = this.connected(r);
-      if (p > 0 && wasConn && this.rand() < p * dt) r.dropUntil = s.t + 2.5 + this.rand() * 5;
+      const dropMax = (f && f.ap === apId ? f.dropMax : null) || (fw && r.firmware === fw.firmware ? fw.dropMax : null) || 7.5;
+      if (p > 0 && wasConn && this.rand() < p * dt) r.dropUntil = s.t + 2.5 + this.rand() * (dropMax - 2.5);
       const baseRssi = -50 - Math.abs(r.x - APS[apId].x) * 0.6 - Math.abs(r.z - APS[apId].z) * 0.4;
       r.rssi = Math.round(baseRssi - (p > 0 && f && f.ap === apId ? 14 : 0) + (this.rand() - 0.5) * 3);
       const conn = this.connected(r);
@@ -566,6 +577,10 @@ export class Sim {
     const conn = this.connected(r);
     if (!conn && moving) {
       if (s.t - r.lastConn > 2) { r.resume = r.state; r.state = 'comms_stop'; r.stopSince = s.t; r._reconAt = null; this.rlog(r, 'WARN', 'COMMS_LOSS_SAFE_STOP', `Link to fleet manager lost >2 s; controlled stop (zone ${zoneOf(r.x, r.z)})`); }
+    }
+    if (r.state === 'comms_stop' && !conn && r.taskId && r.payload === 'empty' && r.resume === 'to_pick' && s.t - r.stopSince > 4) {
+      this.rlog(r, 'ERROR', 'TASK_ABORTED_COMMS', `Link lost for more than 6 s during ${r.taskId}; abandoning task before pick (safety policy)`);
+      r._abortedTask = r.taskId; r.taskId = null; r.idem = null; r.path = []; r.resume = 'idle';
     }
     if (r.state === 'comms_stop') {
       if (conn) { if (r._reconAt == null) r._reconAt = s.t; if (s.t - r._reconAt >= 1) { r.state = r.resume || 'idle'; r.resume = null; r.stopSince = null; r._reconAt = null; this.rlog(r, 'INFO', 'COMMS_RESTORED', 'Link restored; resuming'); } }
@@ -690,7 +705,7 @@ export class Sim {
       s.counters.failed++; this.win('task_failed', { robot: r.id, zone: zoneOf(r.x, r.z), code: 'ITEM_NOT_FOUND', loc: tk.loc });
       delete s.fm.assignments[r.id]; r.taskId = null; r.state = 'idle';
       inv.reserved = Math.max(0, inv.reserved - 1);
-      if (tk.failCount >= 3) {
+      if (tk.failCount >= (s.config.maxPickFailures || 3)) {
         tk.doneAt = s.t; this._th(tk, 'failed', 'short pick: 3 failures');
         const o = s.orders[tk.orderId]; o.state = 'exception'; o.doneAt = s.t;
         this.log('ERROR', 'order-service', 'ORDER_EXCEPTION', `Order ${o.id} moved to exception: short pick on ${tk.sku}`, { order: o.id, corr: o.corr, task: tk.id });

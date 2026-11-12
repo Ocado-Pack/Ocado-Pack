@@ -16,7 +16,7 @@ const BOX_INTERVALS = [0, 1, 3, 7, 14]; // days
 
 const DEFAULTS = () => ({
   version: 1,
-  settings: { quality: 'auto', reducedMotion: matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false, captions: true, narration: false, mode: 'guided', textScale: 1, highContrast: false, packs: { mobile: true, stations: true, charging: true, network: true, conveyors: false, plc: false } },
+  settings: { quality: 'auto', reducedMotion: globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false, captions: true, narration: false, mode: 'guided', textScale: 1, highContrast: false, packs: { mobile: true, stations: true, charging: true, network: true, conveyors: false, plc: false } },
   onboarding: { step: 0, done: false },
   seenTerms: {},
   attempts: [],

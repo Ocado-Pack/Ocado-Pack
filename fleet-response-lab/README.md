@@ -25,11 +25,17 @@ python3 -m http.server 8000
 Then open <http://localhost:8000>. Any static file server works. Progress is saved in your browser's
 `localStorage` only.
 
-Run the headless engine validation suite (Node 18+):
+Run the headless validation suites (Node 18+):
 
 ```bash
 node tests/validate.mjs
 ```
+
+```bash
+node tests/validate-comms.mjs
+```
+
+The second suite checks the communication module's acceptance criteria: documents and messages cannot cite evidence that was never collected; characters react to missing or contradicting information; handoffs need the receiving technician's acceptance; closure needs passing recovery checks; assessment mode does not leak model answers or hidden causes (hints, dialogue, document drafts); repeat attempts vary the cause and evidence; a confident but unsupported diagnosis scores low on accuracy; runbooks must survive the simulated technician on two occurrences; and the benchmark needs three different independent passes with no critical failures.
 
 ## What's inside
 
@@ -45,6 +51,7 @@ node tests/validate.mjs
 | **W6 Live ops** | Timed incident ("Orders are backing up, and several robots appear idle") with a misleading alarm, an unrelated E-stop, incomplete information, update requests and a mitigation tradeoff. Editable update templates, commitment tracking, escalation, verification, closure. Technical and communication scored separately; speed is never rewarded on its own. Optional ~40-min capstone. |
 | **Reverse-building** | Dependency map from an order failure, failure-pattern dashboard, step ordering, runbook from an incident, telemetry to separate two causes. |
 | **Review & progress** | Mistake-driven spaced review (template-generated, no AI), seven tracked skills, transparent deductions, exports, resets. |
+| **Communication & interview module** | Four stages unlocked by performance: (1) annotated worked example + comprehension check, (2) partially guided incident, (3) independent incidents (no hints or model answers until submission), (4) mock interview. Loop: Inspect → Ask → Hypotheses → Test → Communicate → Mitigate → Verify → Document → Handoff → Reflect, with a structured pause before important actions. Incidents A–J (vague report, ETA pressure, incomplete escalation, shift transition, recovery without confirmed cause, conflicting explanations, incorrect earlier update, recurring failure/runbook, partial recovery, concurrent incidents), the 06:45 shift-end first exercise and a ~40-min capstone. Fictional operations staff, technicians, engineers and a manager respond to the live simulation over radio and team chat; tickets, escalations, a live shift-handoff board, knowledge-base pages and an interview room. 100-point rubric (accuracy 25, reasoning 20, communication 15, documentation 15, ownership 15, timeliness 10) with quoted deductions and four critical failures; first attempt preserved; required independent revision; transfer incident; configurable 85/100 internal practice benchmark across three different independent incidents. Runbooks are tested by a simulated technician who executes the steps against two occurrences. Exportable portfolio and a requirements map built from the supplied responsibilities, with missing employer requirements marked “to verify”. |
 | **Interview practice** | Questions after every incident; honest drafts built only from your attempt data and always labelled as simulation practice; a separate field for real experience you supply yourself. |
 
 ## Design notes
@@ -65,5 +72,7 @@ fleet-response-lab/
   js/sim/            engine, catalog (components, diagnostics, operations, checks, metrics), scenarios, history, visual
   js/scene/          procedural 3D warehouse
   js/ui/             walkthrough pages, investigation runner, live ops, exercises, review, progress, interview
+  js/comms/          communication module: scenarios A–J, personas, rules, documents, scoring
   tests/validate.mjs headless consistency & recovery validation
+  tests/validate-comms.mjs communication-module acceptance tests
 ```
