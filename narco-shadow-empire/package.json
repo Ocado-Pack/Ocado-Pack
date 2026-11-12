@@ -1,0 +1,17 @@
+{
+  "name": "narco-shadow-empire",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "NARCO: SHADOW EMPIRE - Operation Numbers. A 3D investigation game that trains ASVAB Arithmetic Reasoning and Mathematics Knowledge.",
+  "scripts": {
+    "dev": "node tools/serve.mjs",
+    "build": "node tools/build.mjs",
+    "test": "node --test \"tests/unit/**/*.test.mjs\"",
+    "e2e": "node tools/e2e.cjs",
+    "shot": "node tools/shot.cjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

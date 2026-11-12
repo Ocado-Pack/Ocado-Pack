@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>NARCO: SHADOW EMPIRE - Operation Numbers</title>
+<meta name="description" content="A cinematic 3D investigation game that trains ASVAB Arithmetic Reasoning and Mathematics Knowledge. Unofficial study aid.">
+<style>
+  html, body { margin: 0; height: 100%; background: #05070b; color: #e8eef5; overflow: hidden; overscroll-behavior: none; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; touch-action: none; }
+  #ui { position: fixed; inset: 0; pointer-events: none; }
+  #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+          background: radial-gradient(ellipse at 50% 60%, #0d1622 0%, #05070b 70%); z-index: 9999;
+          font: 600 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; letter-spacing: .28em; text-transform: uppercase; color: #9fb3c8; }
+  #boot b { font-size: clamp(22px, 4vw, 44px); letter-spacing: .18em; color: #f2f5f9; }
+  #boot i { font-style: normal; color: #f0a43a; }
+  #boot.done { opacity: 0; pointer-events: none; transition: opacity .6s ease; }
+</style>
+<link rel="stylesheet" href="src/styles/base.css">
+<link rel="stylesheet" href="src/styles/hud.css">
+<link rel="stylesheet" href="src/styles/menus.css">
+<link rel="stylesheet" href="src/styles/phone.css">
+<link rel="stylesheet" href="src/styles/puzzle.css">
+<link rel="stylesheet" href="src/styles/study.css">
+<link rel="stylesheet" href="src/styles/visuallab.css">
+<link rel="stylesheet" href="src/styles/touch.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }</script>
+</head>
+<body>
+<canvas id="game" tabindex="-1"></canvas>
+<div id="ui"></div>
+<div id="boot"><b>NARCO: <i>SHADOW EMPIRE</i></b><span id="boot-label">Operation Numbers</span></div>
+<noscript><p style="position:fixed;inset:0;display:grid;place-items:center;color:#fff;font:16px system-ui">This game needs JavaScript and WebGL.</p></noscript>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

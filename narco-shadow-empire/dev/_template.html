@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- HARNESS TEMPLATE. Copy to dev/<your-module>.html and boot only the systems you need.
+     Run:  node tools/shot.cjs "dev/<your-module>.html?quality=low" --out /tmp/shot.png -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>harness</title>
+<style>html,body{margin:0;height:100%;background:#05070b;color:#e8eef5;overflow:hidden;font:14px system-ui}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block}#ui{position:fixed;inset:0;pointer-events:none}</style>
+<link rel="stylesheet" href="../src/styles/base.css">
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui"></div>
+<script type="module">
+import { createContext } from '../src/core/context.js';
+// import { createRenderer } from '../src/world/renderer.js';   // ...the systems under test
+const ctx = createContext();            // also window.__game
+// createRenderer(ctx); ...
+ctx.flow.setMode('world');
+ctx.loop.start();
+window.__ready = true;                   // tools/shot.cjs waits for this
+</script>
+</body>
+</html>
