@@ -1,12 +1,12 @@
 # SESSION HANDOFF — NARCO: SHADOW EMPIRE (Operation Numbers)
 
-Snapshot: 2026-11-12, end of session 3 (rendering core, materials, collision, input, zones) · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
+Snapshot: 2026-11-12, end of session 3 (rendering core, materials, collision, input, zones, motion) · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
 (all paths below are relative to it). Read with `docs/NEXT_TASKS.md` and `docs/ARCHITECTURE.md`.
 
 > **Honest one-line status:** the learning core (question engine for 4 of 20 topics, learner profile, tutor hint ladder,
 > session report) and the **rendering core** (renderer with honest 4K modes, post chain, sky / time of day / fog, rain
-> and particles, procedural PBR material library) are built and verified, and so are three logic modules of the
-> actors core (collision, input, zones) — 59 unit tests, 4 browser scenarios, self-test 11/11. **There is still no world, no character control, no vehicle, no UI and no mission.** The game is
+> and particles, procedural PBR material library) are built and verified, and so are four logic modules of the
+> actors core (collision, input, zones, character motion) — 64 unit tests, 4 browser scenarios, self-test 11/11. **There is still no world, no character control, no vehicle, no UI and no mission.** The game is
 > not playable: the page boots both cores and shows a status line; the 3D can only be seen in the harness pages
 > `dev/render.html` (boxes) and `dev/materials.html` (a showroom street of facades, panels, neon and signs).
 
@@ -134,7 +134,8 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | City block, warehouse, pier, garage, hotel/ops room | **Not implemented** | planned `src/world/{world,city,warehouse,pier,garage,hotel}.js` |
 | Input `ctx.input`: keyboard map, press / release edges per frame, flow gating (interface actions pass, gameplay actions do not), mouse look + wheel, virtual stick / buttons / taps for touch and tests | **Done, verified** in Node (4 tests; 4 deliberate breaks caught). **Not verified:** the browser event layer (`attach()`: pointer lock, drag-look, focus loss) — it has no consumer yet; cover it in the player harness E2E. No gamepad | `src/core/input.js`, `tests/unit/input.test.mjs` |
 | Zones `ctx.zones`: enter / exit with hysteresis, smoothed `indoor`, ambience of the smallest zone, accepts `layout.ZONES` | **Done, verified** in Node (2 deliberate breaks caught). Registered but empty: the world builders add the zones | `src/world/zones.js` |
-| Player, camera, interact, character model, touch controls | **Not implemented** (`character.js` is still the capsule stub) | planned `src/world/{player,camera,interact}.js`, `src/ui/touch.js` |
+| Character motion rules: walk 1.8 / run 5 / crouch-walk 1.1 m/s, camera-relative, 1 m jump with coyote time and buffering, crouch with headroom check, footsteps by distance and surface | **Done, verified** in Node against the real collision world (5 tests; 6 deliberate breaks caught). It is a library: nothing drives it yet | `src/world/motion.js`, `tests/unit/motion.test.mjs` |
+| Player (scene object, input → motion), camera, interact, character model, touch controls | **Not implemented** (`character.js` is still the capsule stub) | planned `src/world/{player,camera,interact}.js`, `src/ui/touch.js` |
 | Vehicle + dashboard telemetry | **Not implemented** | planned `src/world/{vehicle,carmodel}.js` |
 | NPCs, traffic, pedestrians | **Not implemented** | — |
 | UI: HUD, dialog/subtitles, documents, menus, pause, settings, phone, map | **Not implemented** | planned `src/ui/*`, `src/game/dialog.js` |
@@ -149,11 +150,11 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 ## 4. Current unfinished work (resume exactly here)
 
 **Nothing is half-done inside a file.** P0 tasks 1 (math engine), 2 (learner model), 3 (rendering core) and 4
-(materials) are complete; P0 task 5 (actors core) has three of its modules finished and tested: collision, input and
-zones. Everything is committed and pushed.
+(materials) are complete; P0 task 5 (actors core) has four of its modules finished and tested: collision, input,
+zones and the character motion rules. Everything is committed and pushed.
 
-- **Last successful results:** `npm test` → 59 tests, 59 pass (7 core/layout, 9 math, 12 learning, 13 rendering,
-  5 texture generator, 8 collision, 5 input + zones); `node --test .claude/hooks/context-guard.test.mjs` → 7/7; `npm run e2e` → 4/4 scenarios
+- **Last successful results:** `npm test` → 64 tests, 64 pass (7 core/layout, 9 math, 12 learning, 13 rendering,
+  5 texture generator, 8 collision, 5 input + zones, 5 motion); `node --test .claude/hooks/context-guard.test.mjs` → 7/7; `npm run e2e` → 4/4 scenarios
   (learning on the dev page, learning in the single-file build from `file://`, rendering core with 18 checks,
   materials with 6 checks); `npm run build` → 693 KB.
 - **Current errors:** none known. The only console noise is Chromium's "GPU stall due to ReadPixels" warning, which
@@ -166,12 +167,13 @@ zones. Everything is committed and pushed.
   roughness) were all caught on the first run.
 
 **Exact next action — continue P0 task 5, actors core** (`docs/NEXT_TASKS.md`; spec in
-`docs/briefs/narco-actors.workflow.js`). Done: `collision.js`, `input.js`, `zones.js`. Remaining, in this order:
-1. `src/world/player.js` → `ctx.player` (ARCHITECTURE §6): capsule r 0.35 / h 1.8 (crouch 1.1) moved with
-   `ctx.collision.moveCapsule`; camera-relative movement from `ctx.input.move` and `ctx.cameraRig.yaw`; walk 1.8 m/s,
-   run 5, crouch-walk 1.1; gravity 22 m/s²; jump ≈ 1 m with coyote time and buffering; states; `teleport(anchor | pos)`;
-   emits `player:step` / `jump` / `land`. Keep the motion maths free of three.js where it is easy, so a Node test can
-   walk the capsule around `createCollisionWorld()`.
+`docs/briefs/narco-actors.workflow.js`). Done: `collision.js`, `input.js`, `zones.js`, `motion.js`. Remaining, in this
+order:
+1. `src/world/player.js` → `ctx.player` (ARCHITECTURE §6), a thin wrapper around `createMotion(ctx.collision)`:
+   each frame build the command from `ctx.input` (`move`, `down('run')`, `pressed('jump')`, `pressed('crouch')`) and
+   `ctx.cameraRig.yaw`, call `motion.step(dt, cmd)`, copy position / yaw into a `THREE.Group`, drive the character
+   model with `motion.state`, and re-emit the returned events as `player:step` / `player:jump` / `player:land`.
+   Add `teleport(anchorId | [x, y, z], yaw)` (layout `ANCHORS`), `setEnabled`, `setVisible`, `gesture`, state `'driving'`.
 2. `src/world/camera.js` → `ctx.cameraRig`: third-person follow (pivot 1.55 m above the feet, distance 3.6 m, pitch
    −35°…+65°), pulled in by `collision.raycast(pivot, dir, dist, 'camera')` with a 0.25 m margin, `focus`, `setPose`,
    `shake`; honours `fov`, `mouseSens`, `invertY`, `reducedMotion`.

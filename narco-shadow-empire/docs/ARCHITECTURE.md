@@ -332,6 +332,12 @@ player.state 'idle'|'walk'|'run'|'jump'|'fall'|'crouch'|'crouchwalk'|'driving'
 player.teleport(anchorId | [x,y,z], yaw?) · player.setVisible(b) · player.setEnabled(b) · player.gesture('inspect'|'use'|'pickup'|'talk')
 ```
 Third-person, capsule (r 0.35, h 1.8; crouch 1.1) vs the AABB world, step-up 0.4, walk 1.8 m/s, run 5 m/s, jump ~1 m.
+The motion rules live in `src/world/motion.js` (**implemented**, pure, unit-tested): `createMotion(collision)` →
+`{position, velocity, yaw, grounded, crouching, height, speed, state, teleport(x, y, z, yaw), step(dt, {moveX, moveY,
+cameraYaw, run, jump, crouchToggle, crouchHold}) → events [{type: 'step'|'jump'|'land', surface?, running?, speed?}]}`
+(gravity 22 m/s², 0.12 s coyote time and jump buffer, no standing up under a low ceiling, footsteps by distance with the
+surface taken from the collider's tag). `player.js` only has to translate input into that command and copy the result
+into the scene.
 `createCharacter({preset, colors})` → `{object, animate(state, dt, speed), setPose(…)}` procedural humanoid with walk /
 run / idle / crouch / jump / sit-drive / gesture animation (also used for NPCs).
 
