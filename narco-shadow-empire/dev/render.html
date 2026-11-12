@@ -1,0 +1,186 @@
+<!doctype html>
+<!-- Rendering-core harness: renderer + post chain, sky / time of day / fog, rain and particle emitters on a small test
+     set (wet ground, building-sized boxes fading into the distance, neon bars, three sodium lamps, a steam grate).
+
+     node tools/shot.cjs "dev/render.html?quality=medium&time=22.5&weather=rain" --w 960 --h 540 --out dev/out/night-rain.png
+     node tools/shot.cjs "dev/render.html?quality=medium" --w 960 --h 540 --scenario dev/render.shots.cjs     (the whole matrix)
+
+     URL parameters
+       time=22.5          hour 0-24                         weather=rain     clear | overcast | rain | storm | fog | dust
+       intensity=1        weather intensity 0-1             wet=0..1         force the ground wetness
+       quality=high       low | medium | high | ultra       res=native       native | fixed4k | dynamic
+       cam=street         street | wide | low | sky | moon | sun | lamp      fov=62
+       clock=0            game minutes per real second      frames=3         rendered frames before window.__ready
+       parts=gfx,env,weather   which systems to create      hud=0            hide the readout
+       nogl=1             pretend WebGL is unavailable      lang=es
+     Script it from a scenario through window.__h:  await __h.set({time: 6.3, weather: 'fog', cam: 'wide'}), __h.info() -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>render harness</title>
+<style>html,body{margin:0;height:100%;background:#05070b;color:#e8eef5;overflow:hidden;font:14px system-ui}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block}#ui{position:fixed;inset:0;pointer-events:none}
+#readout{position:fixed;left:8px;top:8px;margin:0;padding:6px 9px;background:rgba(5,8,12,.72);border:1px solid rgba(255,255,255,.14);border-radius:6px;
+  font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#cfe0ee;white-space:pre;pointer-events:none}
+#readout b{color:#f0a43a}</style>
+<link rel="stylesheet" href="../src/styles/base.css">
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui"></div>
+<pre id="readout"></pre>
+<script type="module">
+import * as THREE from 'three';
+import { createContext } from '../src/core/context.js';
+import { flag } from '../src/core/params.js';
+import { createRenderer } from '../src/world/renderer.js';
+
+const ctx = createContext();
+const p = ctx.params;
+const parts = (p.parts || 'gfx,env,weather').split(',');
+if (flag(p, 'nogl')) HTMLCanvasElement.prototype.getContext = () => null;
+if (p.res) ctx.settings.set('resolutionMode', p.res);
+if (p.fov) ctx.settings.set('fov', Number(p.fov));
+
+const gfx = createRenderer(ctx);
+const { scene, camera } = gfx;
+let env = null, weather = null;
+if (parts.includes('env')) env = (await import('../src/world/environment.js')).createEnvironment(ctx);
+if (parts.includes('weather')) weather = (await import('../src/world/weather.js')).createWeather(ctx);
+if (!env) {   // renderer-only run: plain lights so the test set is visible
+  scene.background = new THREE.Color(0x0b1018);
+  scene.add(new THREE.HemisphereLight(0x8a9cc8, 0x57483c, 1.0));
+  const d = new THREE.DirectionalLight(0xa9bfe6, 0.6); d.position.set(-30, 45, 25); d.castShadow = true;
+  d.shadow.camera.left = d.shadow.camera.bottom = -45; d.shadow.camera.right = d.shadow.camera.top = 45; d.shadow.camera.far = 200;
+  scene.add(d);
+}
+
+// ---- test set ---------------------------------------------------------------------------------------------------
+const wetU = { value: 0 };
+/** A rough dark surface that turns glossy and grows mirror-like puddles as uWet rises (the materials library will do this properly). */
+function wettable(mat) {
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uWet = wetU;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      varying vec3 vWPos; uniform float uWet;
+      float wHash( vec2 q ) { vec3 q3 = fract( vec3( q.xyx ) * 0.1031 ); q3 += dot( q3, q3.yzx + 33.33 ); return fract( ( q3.x + q3.y ) * q3.z ); }
+      float wNoise( vec2 q ) { vec2 i = floor( q ), f = fract( q ); f = f * f * ( 3.0 - 2.0 * f );
+        return mix( mix( wHash( i ), wHash( i + vec2( 1.0, 0.0 ) ), f.x ), mix( wHash( i + vec2( 0.0, 1.0 ) ), wHash( i + vec2( 1.0, 1.0 ) ), f.x ), f.y ); }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      diffuseColor.rgb *= ( 0.8 + 0.4 * wNoise( vWPos.xz * 3.1 ) ) * mix( 1.0, 0.58, uWet );`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+      float puddle = smoothstep( 0.5, 0.6, wNoise( vWPos.xz * 0.21 ) * 0.65 + wNoise( vWPos.xz * 0.83 + 7.0 ) * 0.35 ) * smoothstep( 0.25, 0.8, uWet );
+      roughnessFactor = mix( roughnessFactor * ( 0.9 + 0.2 * wNoise( vWPos.xz * 9.0 ) ) * mix( 1.0, 0.45, uWet ), 0.035, puddle );`);
+  };
+  return mat;
+}
+const std = (color, roughness = 0.85, metalness = 0, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
+const set = new THREE.Group(); set.name = 'testSet'; scene.add(set);
+const add = (geo, mat, x, y, z, shadow = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = shadow; m.receiveShadow = true; set.add(m); return m; };
+
+const ground = add(new THREE.PlaneGeometry(60, 60), wettable(std(0x3a3d42, 0.93)), 0, 0, -18, false); ground.rotation.x = -Math.PI / 2;
+const far = add(new THREE.PlaneGeometry(900, 900), std(0x24272b, 0.95), 0, -0.03, -120, false); far.rotation.x = -Math.PI / 2;
+const sidewalkMat = wettable(std(0x6f6a62, 0.88));
+for (const sx of [-1, 1]) add(new THREE.BoxGeometry(3, 0.15, 60), sidewalkMat, sx * 7.5, 0.075, -18, false);
+
+// building-sized boxes in depth layers: a street that runs north (-Z) and fades into the fog
+const wallMats = [std(0x8a5a44, 0.9), std(0xb9a98c, 0.88), std(0x6d7780, 0.8), std(0x9a8f86, 0.92), std(0x5c4a44, 0.9)];
+const blocks = [[-13, 9, -6, 8, 12], [13, 12, -8, 8, 14], [-13, 14, -22, 8, 14], [13, 7, -24, 8, 12], [-14, 10, -40, 10, 16], [14, 13, -42, 10, 16],
+  [-16, 12, -64, 12, 20], [16, 9, -66, 12, 20], [-20, 14, -96, 16, 28], [20, 11, -100, 16, 28], [-26, 13, -140, 20, 30], [24, 16, -150, 20, 30], [0, 22, -190, 30, 20]];
+blocks.forEach(([x, h, z, w, d], i) => add(new THREE.BoxGeometry(w, h, d), wallMats[i % wallMats.length], x, h / 2, z));
+
+// neon bars (emissive, so they feed the bloom) with a matching coloured light each
+const lamps = [];
+const neon = (color, x, y, z, len, vertical) => {
+  const m = add(new THREE.BoxGeometry(vertical ? 0.14 : len, vertical ? len : 0.14, 0.14), new THREE.MeshStandardMaterial({ color: 0x111111, emissive: color, emissiveIntensity: 5, roughness: 0.4 }), x, y, z, false);
+  const l = new THREE.PointLight(color, 22, 14, 2); l.position.set(x + (x < 0 ? 1.0 : -1.0), y, z); set.add(l);
+  lamps.push({ light: l, position: l.position, color: l.color, intensity: l.intensity, distance: l.distance });
+  return m;
+};
+neon(0xff2d95, -8.9, 3.4, -5, 3.2, false); neon(0x22e0ff, 8.9, 4.2, -9, 3.6, true); neon(0xffb020, -8.9, 4.0, -20, 2.6, false);
+
+// three sodium street lamps
+const poleMat = std(0x2c3136, 0.6, 0.7), headMat = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xffa040, emissiveIntensity: 7 });
+for (const [x, z] of [[-5.6, -3], [5.6, -15], [-5.6, -28]]) {
+  add(new THREE.CylinderGeometry(0.07, 0.1, 6, 10), poleMat, x, 3, z);
+  add(new THREE.BoxGeometry(1.5, 0.08, 0.1), poleMat, x - Math.sign(x) * 0.7, 5.95, z);
+  add(new THREE.BoxGeometry(0.5, 0.1, 0.24), headMat, x - Math.sign(x) * 1.35, 5.88, z, false);
+  const l = new THREE.PointLight(0xffb46b, 130, 28, 2); l.position.set(x - Math.sign(x) * 1.35, 5.7, z); set.add(l);
+  lamps.push({ light: l, position: l.position, color: l.color, intensity: l.intensity, distance: l.distance });
+}
+
+// reference objects: a chrome ball (environment map), a matte ball, a 1.8 m figure, a crate, a steam grate
+add(new THREE.SphereGeometry(0.6, 48, 24), std(0xffffff, 0.06, 1), -1.6, 0.6, -5);
+add(new THREE.SphereGeometry(0.6, 48, 24), std(0xd8d2c8, 0.75), 1.4, 0.6, -6.5);
+add(new THREE.CapsuleGeometry(0.28, 1.24, 6, 14), std(0x2b3a4a, 0.8), 3.2, 0.9, -4);
+add(new THREE.BoxGeometry(1.1, 1.1, 1.1), std(0x7a5a36, 0.85), -3.4, 0.55, -8);
+add(new THREE.BoxGeometry(1.2, 0.04, 0.8), std(0x15171a, 0.5, 0.8), 0.4, 0.02, -10, false);
+if (weather) {
+  weather.addEmitter({ type: 'steam', position: [0.4, 0.06, -10] });
+  weather.setLights(lamps);
+}
+
+// ---- cameras ----------------------------------------------------------------------------------------------------
+const cams = {
+  street: { position: [0.6, 1.7, 5.5], lookAt: [0, 2.6, -18] },
+  wide: { position: [-21, 15, 15], lookAt: [0, 2, -30] },
+  low: { position: [1.2, 0.45, 3.5], lookAt: [-3.5, 2.4, -12] },
+  sky: { position: [0, 1.7, 6], lookAt: [-10, 22, -40] },
+  lamp: { position: [-1.5, 1.6, 0.5], lookAt: [-4.6, 4.6, -3] },
+};
+function setCam(name) {
+  let c = cams[name];
+  if (!c && env && (name === 'moon' || name === 'sun')) { const d = name === 'moon' ? env.moonDir : env.sunDir; c = { position: [0, 1.7, 6], lookAt: [d.x * 100, 1.7 + d.y * 100, 6 + d.z * 100] }; }
+  c = c || cams.street;
+  camera.position.fromArray(c.position); camera.lookAt(new THREE.Vector3().fromArray(c.lookAt));
+}
+
+// ---- state from the URL, readout, script hooks -------------------------------------------------------------------
+const readout = document.getElementById('readout');
+if (p.hud === '0') readout.style.display = 'none';
+const forcedWet = p.wet !== undefined ? Number(p.wet) : null;
+function apply(o) {
+  if (o.quality) ctx.settings.applyQuality(o.quality);
+  if (o.res) ctx.settings.set('resolutionMode', o.res);
+  if (env) {
+    if (o.time !== undefined) env.setTime(Number(o.time), { instant: true });
+    if (o.weather) env.setWeather(o.weather, { intensity: o.intensity === undefined ? 1 : Number(o.intensity), instant: true });
+  }
+  if (o.cam) setCam(o.cam);
+}
+ctx.register('harness', { update() {
+  wetU.value = forcedWet !== null ? forcedWet : env ? env.wetness : 0;
+  for (const l of lamps) l.intensity = l.light.intensity;
+} }, { order: 52, runWhenPaused: true });
+
+function info() {
+  const i = gfx.getInfo();
+  return { ...i, fps: Math.round(i.fps * 10) / 10, hour: env ? env.hour : null, weather: env ? env.weather : null, night: env ? env.isNight : null,
+    wetness: env ? Math.round(env.wetness * 100) / 100 : null, exposure: Math.round(gfx.exposure * 100) / 100, weatherStats: weather ? weather.stats() : null };
+}
+function paint() {
+  const i = info();
+  const hh = i.hour === null ? '' : `${String(Math.floor(i.hour)).padStart(2, '0')}:${String(Math.floor((i.hour % 1) * 60)).padStart(2, '0')}`;
+  readout.innerHTML = `${i.is4K ? '<b>4K</b> ' : ''}${i.bufferW}x${i.bufferH} buffer · ${i.cssW}x${i.cssH} css · ratio ${i.pixelRatio.toFixed(2)} · ${i.mode}${i.limited ? ' (limited)' : ''}\n` +
+    `${i.preset} · ${i.post ? 'post' : 'direct'} · msaa ${i.msaa} · shadows ${i.shadows} · ${i.fps} fps · ${i.drawCalls} calls · ${i.triangles} tris\n` +
+    (env ? `${hh} ${i.night ? 'night' : 'day'} · ${i.weather} · wet ${i.wetness} · exposure ${i.exposure}` + (i.weatherStats ? ` · rain ${i.weatherStats.streaks} · particles ${i.weatherStats.particles}` : '') : 'renderer only');
+}
+setInterval(paint, 500);
+
+/** Resolves once `n` more frames have been drawn. */
+const settle = (n = 2) => new Promise((resolve) => { const goal = gfx.getInfo().frames + n; const t = setInterval(() => { if (gfx.unavailable || gfx.getInfo().frames >= goal) { clearInterval(t); paint(); resolve(info()); } }, 50); });
+window.__h = { ctx, THREE, gfx, env, weather, cams, lamps, setCam, apply, info, settle, set: async (o, n = 3) => { apply(o); return settle(n); } };
+
+apply({ time: p.time === undefined ? 22.5 : p.time, weather: p.weather || 'rain', intensity: p.intensity, cam: p.cam || 'street' });
+if (env && p.clock) env.setClockRate(Number(p.clock));
+ctx.flow.setMode('world');
+ctx.loop.start();
+await settle(Number(p.frames) || 3);
+window.__ready = true;
+</script>
+</body>
+</html>
