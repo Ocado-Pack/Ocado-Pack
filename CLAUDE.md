@@ -37,6 +37,16 @@ call → drive to the warehouse → AR problem "3 trucks × 18 cases − 14 = 40
 - Fiction only (city Puerto Ceniza, syndicate El Consorcio Sombra); nothing actionable about real crime.
 - Do not put model names/identifiers in code, docs or commit messages beyond the session's required trailers.
 
+## Context guard (automatic handoff)
+- `.claude/settings.json` wires `.claude/hooks/context-guard.mjs` to SessionStart, UserPromptSubmit, PreToolUse,
+  PostToolBatch, Stop, PreCompact and the status line. Thresholds, as a share of the context window (1M tokens for the
+  current model): **65% prepare the handoff · 70% complete and verify it · 75% development tools are blocked**.
+- When a `[context-guard]` message appears, follow it: finish the safe operation, update the handoff docs, commit, run
+  `node .claude/hooks/context-guard.mjs verify-handoff`, report HANDOFF READY. A fresh session starts from
+  `narco-shadow-empire/docs/RESUME_PROMPT.md`.
+- `node .claude/hooks/context-guard.mjs status` shows the reading · tests: `node --test .claude/hooks/context-guard.test.mjs`
+  · the user can lift the guard with `touch .claude/state/guard-off`. The guard never commits, pushes or deletes.
+
 ## Working style that fits this project
 - **Token budget is the binding constraint.** A 21-agent parallel fan-out at maximum reasoning effort exhausted
   the 5-hour usage limit before writing any code. Write code directly in large, complete files; test with Node

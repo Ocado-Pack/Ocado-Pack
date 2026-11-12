@@ -1,6 +1,6 @@
 # SESSION HANDOFF — NARCO: SHADOW EMPIRE (Operation Numbers)
 
-Snapshot: 2026-11-12, end of session 2 · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
+Snapshot: 2026-11-12, end of session 2 (context guard added) · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
 (all paths below are relative to it). Read with `docs/NEXT_TASKS.md` and `docs/ARCHITECTURE.md`.
 
 > **Honest one-line status:** the learning core is built and verified (question engine for 4 of 20 topics, learner
@@ -130,6 +130,7 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | Puzzle panel + tutor UI, debrief, dashboard, drills, exam UI, visual lab | **Not implemented** | planned `src/ui/*` |
 | Missions, campaign, cinematics, save/load, app controller | **Not implemented** | planned `src/game/*` |
 | Audio | **Not implemented** | planned `src/core/audio.js` |
+| Context guard: thresholds 65 / 70 / 75 % of the context window, handoff verification, resume prompt | **Done, verified** — 7 simulation tests; on the real harness (separate headless process) SessionStart, UserPromptSubmit, PreToolUse deny, PostToolBatch and Stop all fired. Not verified live: the status line (no terminal UI in cloud sessions), PreCompact, and the one-time loop stop at 75 % | `.claude/settings.json`, `.claude/hooks/context-guard.{mjs,config.json,test.mjs}`, `docs/RESUME_PROMPT.md` |
 | Boot wiring | **Partial** — learning core only (ctx, math, profile, session, tutor, selfTest); no renderer, world, UI or missions | `src/main.js` |
 
 ---
@@ -139,7 +140,7 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 **Nothing is half-done.** P0 tasks 1 (math engine) and 2 (learner model) are complete, committed and pushed.
 
 - **Last successful results:** `npm test` → 28 tests, 28 pass (7 core/layout, 9 math, 12 learning);
-  `npm run e2e` → 2/2 scenarios pass; `npm run build` → `dist/narco-shadow-empire.html` (120 KB).
+  `node --test .claude/hooks/context-guard.test.mjs` → 7/7 pass; `npm run e2e` → 2/2 scenarios pass; `npm run build` → `dist/narco-shadow-empire.html` (120 KB).
 - **Current errors:** none known.
 - **How the tests were checked:** 14 deliberate one-line breaks (credit rule, reveal gate, SRS delay, leak check,
   independent check, displayed equation …) were applied one at a time; the suite failed for all 14 after one gap
@@ -232,6 +233,11 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 - Node 22, npm 10, 4 CPUs, Chromium at `/opt/pw-browsers`. `npm install` in `narco-shadow-empire/` restores
   esbuild (node_modules is git-ignored).
 - The session scratchpad and `~/.claude` workflow files are **not** persistent — everything needed is in the repo.
+- Context guard: Claude Code 2.1.322 cloud session (entry point `remote_mobile`); the model's context window is
+  1,000,000 tokens (650K / 700K / 750K thresholds). Hook input carries no context data and cloud sessions have no
+  status line, so the guard reads the newest API usage from the session transcript (same formula as
+  `context_window.used_percentage`). Hooks are loaded when a session process starts — settings edited mid-session
+  are not picked up. When session 2 ended the context stood at about 66 % (prepare stage).
 - `node --test tests/unit/` (a directory) fails with MODULE_NOT_FOUND on Node 22 — use `npm test` or name the files.
 - Git: commit on `claude/narco-shadow-empire-asvab-erthmj`, push with `git push -u origin <branch>`; no PR unless
   the user asks.

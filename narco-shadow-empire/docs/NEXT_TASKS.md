@@ -89,3 +89,5 @@ the demo target is roughly 7k lines in total.
 1. Publish the finished single-file build as a private Artifact link, or keep it as a repo file only?
 2. Add a link to the game in the profile `README.md` at the repo root?
 3. Confirm the CAT-style exam timing preset once the official figures can be checked.
+4. Start a fresh cloud session automatically at the 75 % hard stop? The session tools can do it, but it is
+   deliberately not automated: every new session spends usage and an unattended relay could repeat. Needs an explicit yes.

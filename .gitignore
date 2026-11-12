@@ -1,0 +1,3 @@
+# runtime state of the context guard (per session, never committed)
+.claude/state/
+.claude/settings.local.json
