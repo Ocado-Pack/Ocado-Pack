@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Robotics Fleet Response Lab</title>
+  <meta name="description" content="Beginner-friendly 3D training simulation for diagnosing a fictional order-fulfillment robot fleet. All equipment, telemetry, logs and procedures are simulated.">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <a class="skip" href="#panel">Skip to activity panel</a>
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◆</span>
+      <div>
+        <h1>Robotics Fleet Response Lab</h1>
+        <p>Training simulation · fictional facility · not affiliated with or endorsed by any employer</p>
+      </div>
+    </div>
+    <div class="simbar">
+      <span class="simtag" title="Everything in this app is simulated">SIMULATION</span>
+      <span class="clock">Facility time <b id="simclock">--:--:--</b></span>
+      <div class="speed" role="group" aria-label="Simulation speed">
+        <button data-speed="0" aria-label="Pause simulation">⏸</button>
+        <button data-speed="1" aria-label="Real-time speed">1×</button>
+        <button data-speed="5" aria-label="Five times speed">5×</button>
+        <button data-speed="20" aria-label="Twenty times speed">20×</button>
+        <button data-skip="60" aria-label="Skip ahead one minute">+1m</button>
+        <button data-skip="300" aria-label="Skip ahead five minutes">+5m</button>
+      </div>
+      <label class="mode">Mode
+        <select id="modeSel" aria-label="Coaching mode">
+          <option value="guided">Guided</option>
+          <option value="assisted">Assisted</option>
+          <option value="assessment">Assessment</option>
+        </select>
+      </label>
+      <button id="layoutBtn" class="btn small" aria-label="Change layout">⇆ Layout</button>
+    </div>
+  </header>
+  <nav class="tabs" aria-label="Sections">
+    <a href="#/home">Start</a>
+    <a href="#/incident">Active incident</a>
+    <a href="#/w1">1 · Hardware</a>
+    <a href="#/w2">2 · Software</a>
+    <a href="#/w3">3 · Observability</a>
+    <a href="#/w4">4 · Documentation</a>
+    <a href="#/w5">5 · Prioritization</a>
+    <a href="#/w6">6 · Live ops</a>
+    <a href="#/exercises">Reverse-build</a>
+    <a href="#/review">Review queue <span id="dueBadge" class="badge" hidden></span></a>
+    <a href="#/progress">Progress</a>
+    <a href="#/interview">Interview</a>
+    <a href="#/glossary">Glossary</a>
+    <a href="#/packs">Equipment packs</a>
+    <a href="#/about">Accuracy</a>
+    <a href="#/settings">Settings</a>
+  </nav>
+  <main class="layout" id="layout">
+    <section class="viewport" id="viewport" aria-label="3D warehouse view">
+      <div class="vtools" role="toolbar" aria-label="3D view controls">
+        <div class="grp" role="group" aria-label="Camera">
+          <button data-cam="overview" aria-pressed="true" title="Warehouse overview (O)">🗺 Overview</button>
+          <button data-cam="orbit" title="Orbit / inspect (R)">🔄 Orbit</button>
+          <button data-cam="first" title="First-person (F)">🚶 First-person</button>
+        </div>
+        <label class="focus">Focus <select id="focusSel" aria-label="Click-to-focus alternative: choose equipment"></select></label>
+        <div class="grp" role="group" aria-label="Technical overlays">
+          <button data-ov="power" aria-pressed="false" title="Power: battery, chargers, charge current">🔋 Power</button>
+          <button data-ov="comms" aria-pressed="false" title="Communications: access points, robot links">📶 Comms</button>
+          <button data-ov="sensors" aria-pressed="false" title="Sensors: obstacle range, localization">📡 Sensors</button>
+          <button data-ov="software" aria-pressed="false" title="Software dependencies with live health">🧩 Software</button>
+        </div>
+        <button id="explodeBtn" disabled title="Exploded component view of the selected robot">💥 Explode robot</button>
+      </div>
+      <div id="fpPad" class="fp-pad" hidden aria-label="First-person movement">
+        <button data-fp="turnl" aria-label="Turn left">⟲</button><button data-fp="fwd" aria-label="Forward">▲</button><button data-fp="turnr" aria-label="Turn right">⟳</button>
+        <button data-fp="left" aria-label="Step left">◀</button><button data-fp="back" aria-label="Back">▼</button><button data-fp="right" aria-label="Step right">▶</button>
+      </div>
+      <div id="depOverlay" class="dep-overlay" hidden></div>
+      <div id="inspector" class="inspector" hidden></div>
+      <div id="legend" class="legend"></div>
+      <div id="caption" class="caption" aria-live="polite" hidden></div>
+      <div id="webglFallback" class="fallback" hidden>
+        <p><b>3D view unavailable</b> (WebGL could not start). Every activity still works from the panel; robot states are listed in the inspector lists and logs.</p>
+      </div>
+    </section>
+    <section class="panel" id="panel" tabindex="-1" aria-live="off"></section>
+  </main>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

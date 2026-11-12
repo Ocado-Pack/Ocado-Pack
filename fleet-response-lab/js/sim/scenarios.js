@@ -258,6 +258,33 @@ export const SCENARIOS = [
     checkCtx: () => ({ service: 'fleet-manager' }), relatedAlarms: ['QUEUE_AGE'],
     hints: { inspect: ['Many robots and all zones → think shared components.', 'Ask what changed at the time the symptom began.', 'Demonstration: look at the dominant log codes across robots.'], test: ['A change close in time is a suspect, not a conviction.', 'Test the rollback somewhere safe first.', 'Demonstration: the sandbox rollback runs the previous version against current state.'] },
   },
+  // ------------------------------------------------------------------ WALKTHROUGH 6: live operations
+  {
+    id: 'w6-backlog', walkthrough: 'W6', title: 'Orders backing up, several robots appear idle', minutes: 25, pack: 'mobile',
+    brief: 'Operations (radio): "Orders are backing up, and several robots appear idle."',
+    target: {}, variants: ['timeout', 'station', 'regression'],
+    setup(sim, v) {
+      sim.run(360);
+      sim.inject('misleadingAlarm', { ap: 'AP-1' });
+      const r11 = sim.robot('R-11'); sim.freeRobot('R-11'); sim.teleport('R-11', AISLES.D, -4); sim.inject('estop', { robot: 'R-11' });
+      if (v === 'timeout') sim.inject('slowService', { ago: 120 });
+      if (v === 'station') { sim.inject('stationDown', { station: 'P-2', kind: 'scanner' }); }
+      if (v === 'regression') sim.inject('regression', { ago: 90 });
+      sim.run(480); void r11; return {};
+    },
+    hypotheses: [{ id: 'timeout', label: 'Slow downstream service (timeouts before robots get work)' }, { id: 'station', label: 'A picking station is unavailable' }, { id: 'regression', label: 'Fleet-manager release regression (ack timeouts)' }, { id: 'network', label: 'Wi-Fi problem (AP-1 alarm)' }, { id: 'estop', label: 'R-11 E-stop is the cause' }],
+    diagnostics: ['fleet_overview', 'queue_metrics', 'alarm_list', 'service_health', 'station_status', 'trace_oldest', 'robot_logs_zone', 'network_zone', 'release_diff', 'station_local'], tests: ['sandbox_concurrency', 'sandbox_rollback'],
+    operations: [['preserve_evidence', {}], ['set_concurrency', { value: 12 }], ['set_concurrency', { value: 4 }], ['restart_service', { service: 'inventory-service' }], ['revert_config', { change: 'CHG-2291' }], ['reroute_station', { station: 'P-2' }], ['restore_station', { station: 'P-2' }], ['request_station_repair', { station: 'P-2' }], ['rollback_release', { service: 'fleet-manager' }], ['restart_service', { service: 'fleet-manager' }], ['request_ap_repair', { ap: 'AP-1' }], ['request_estop_inspection', { robot: 'R-11' }]],
+    checks: ['full_task', 'records_consistent', 'no_dup_stranded', 'safety_valid', 'queue_recovered', 'alarms_clear', 'neighbors_healthy'],
+    truth: {
+      timeout: { cause: 'timeout', scope: 'software configuration', team: 'inventory/WMS engineering', discriminators: ['service_health', 'trace_oldest', 'release_diff'], explanation: 'CHG-2291 cut the inventory-service DB pool 50 → 5. Reservations timed out (3000 ms) and retried with backoff, so work never reached robots — they looked idle and healthy. Raising concurrency improved dispatch attempts but made timeouts worse (mitigation tradeoff). AP-1 channel-utilization alarm was misleading; R-11 E-stop was an unrelated second issue.', mitigation: 'Revert CHG-2291 (owner approval).', permanent: 'Config review + reservation latency SLO alert.', tradeoff: 'Raising scheduler concurrency increased attempts but pushed inventory latency higher.' },
+      station: { cause: 'station', scope: 'station hardware', team: 'station technician', discriminators: ['station_status', 'station_local', 'fleet_overview'], explanation: 'P-2’s scanner failed. Robots carrying totes for P-2 waited at the station (shown WAITING, not faulted), so fewer robots were free and orders backed up. AP-1 alarm was misleading; R-11 E-stop was unrelated.', mitigation: 'Reroute P-2 work to other stations, request station repair, verify, return P-2 to rotation.', permanent: 'Scheduler should use station availability.', tradeoff: 'Rerouting P-2 work increased queues at the other stations.' },
+      regression: { cause: 'regression', scope: 'software release', team: 'fleet software engineering', discriminators: ['robot_logs_zone', 'release_diff', 'sandbox_rollback'], explanation: 'fleet-manager 5.2.0 set ack_timeout_ms to 800. Many assignments timed out, were redelivered (duplicates ignored) and abandoned; robots cycled between idle and aborted tasks. Network was fine; AP-1 alarm misleading; R-11 unrelated.', mitigation: 'Preserve logs, roll back fleet-manager.', permanent: 'Config validation, canary gates.', tradeoff: 'Restarting fleet-manager briefly paused all dispatch and did not fix the cause.' },
+    },
+    resolved(sim, v) { if (v === 'timeout') return { fixed: !sim.s.faults.slowService, mitigated: false }; if (v === 'station') return { fixed: !sim.s.faults.stationDown, mitigated: !sim.s.config.stationRotation['P-2'] }; return { fixed: !sim.s.faults.regression, mitigated: false }; },
+    checkCtx: () => ({ baselineTph: 280 }), relatedAlarms: ['QUEUE_AGE', 'SVC_ERRORS', 'STATION_UNAVAILABLE'],
+    hints: {},
+  },
   // ------------------------------------------------------------------ WALKTHROUGH 4: recovery without confirmed cause
   {
     id: 'w4-unknown', walkthrough: 'W4', title: 'Intermittent disconnects in zone B — cause not found', minutes: 15, pack: 'network',

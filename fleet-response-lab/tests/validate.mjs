@@ -49,6 +49,9 @@ const EXPECT = {
   'w2-timeout/pool': { code: 'RESERVE_TIMEOUT', diag: { service_health: 'degraded', release_diff: 'relevant', sandbox_concurrency: 'worse' }, alarm: 'SVC_ERRORS:inventory-service' },
   'w2-regression/ack_timeout': { code: 'ACK_TIMEOUT_REDELIVER', diag: { release_diff: 'relevant', sandbox_rollback: 'better', network_zone: 'healthy' }, alarm: 'QUEUE_AGE' },
   'w4-unknown/unknown': { diag: { network_zone: 'degraded' } },
+  'w6-backlog/timeout': { robot: 'R-11', state: 'estop', visual: 'estop', alarm: 'AP_CHANNEL_UTIL:AP-1', diag: { service_health: 'degraded', network_zone: 'healthy' } },
+  'w6-backlog/station': { robot: 'R-11', state: 'estop', alarm: 'STATION_UNAVAILABLE:P-2', diag: { station_status: 'unavailable' } },
+  'w6-backlog/regression': { robot: 'R-11', state: 'estop', diag: { release_diff: 'relevant', robot_logs_zone: 'ack' } },
 };
 // correct mitigation/fix per variant; and a plausible-but-wrong action
 const FIX = {
@@ -73,11 +76,15 @@ const FIX = {
   'w2-timeout/pool': [['preserve_evidence', { service: 'inventory-service' }], ['revert_config', { change: 'CHG-2291' }]],
   'w2-regression/ack_timeout': [['preserve_evidence', { service: 'fleet-manager' }], ['rollback_release', { service: 'fleet-manager' }]],
   'w4-unknown/unknown': [['request_ap_repair', { ap: 'AP-2' }]],
+  'w6-backlog/timeout': [['request_estop_inspection', { robot: 'R-11' }], ['revert_config', { change: 'CHG-2291' }]],
+  'w6-backlog/station': [['request_estop_inspection', { robot: 'R-11' }], ['reroute_station', { station: 'P-2' }], ['request_station_repair', { station: 'P-2' }], ['@wait', 210], ['restore_station', { station: 'P-2' }]],
+  'w6-backlog/regression': [['request_estop_inspection', { robot: 'R-11' }], ['rollback_release', { service: 'fleet-manager' }]],
 };
 const WRONG = {
   'r07/obstruction': ['restart_robot', { robot: 'R-07' }], 'r07/localization': ['relocalize', { robot: 'R-07' }], 'r07/network': ['restart_robot', { robot: 'R-07' }], 'r07/taskstate': ['restart_robot', { robot: 'R-07' }],
   'w1-wheel/encoder': ['restart_robot', { robot: 'R-09' }], 'w2-ack/stale_lease': ['restart_robot', { robot: 'R-05' }], 'w2-timeout/pool': ['restart_service', { service: 'inventory-service' }], 'w2-regression/ack_timeout': ['restart_service', { service: 'fleet-manager' }],
   'w2-station/scanner': ['restart_service', { service: 'station-service' }], 'w1-charging/contacts': ['request_charger_repair', { charger: 'C-1' }],
+  'w6-backlog/timeout': ['set_concurrency', { value: 12 }], 'w6-backlog/regression': ['request_ap_repair', { ap: 'AP-1' }],
 };
 
 function applySeq(sim, seq) {
