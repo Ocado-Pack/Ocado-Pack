@@ -255,7 +255,7 @@ world.setInteriorDetail(zoneId, on)                                         // o
 Area builders (`city.js`, `hotel.js`, `garage.js`, `warehouse.js`, `pier.js`) export `buildXxx(ctx, parent)` and
 register their colliders, zones, lamps, interactables and features.
 
-### `ctx.collision` — static colliders (`src/world/collision.js`)
+### `ctx.collision` — static colliders (`src/world/collision.js`) — **implemented** (pure module, unit-tested in Node)
 All static world collision is **axis-aligned boxes** (the whole city is axis-aligned).
 ```js
 collision.addBox(x0, y0, z0, x1, y1, z1, opts?) → handle        // opts: {tag?, player?:true, vehicle?:auto, camera?:auto, enabled?:true}
@@ -267,9 +267,14 @@ handle.setEnabled(b) · handle.remove() · handle.box
 collision.groundY(x, z, fromY, maxUp?) → y        // highest walkable top at (x,z) that is ≤ fromY + maxUp (default step 0.4); 0 if none
 collision.moveCapsule(pos, delta, radius, height) → {x, y, z, grounded, hitWall, hitHead}
 collision.raycast(origin, dir, maxDist, mask?) → {distance, point, normal, handle} | null     // mask: 'player'|'vehicle'|'camera'
-collision.sweepCircleXZ / collision.resolveBoxXZ(cx, cz, halfLen, halfWid, yaw, yMin, yMax) → {x, z, hit, nx, nz}   // vehicles
-collision.debug(on)                 // wireframe overlay
+collision.resolveBoxXZ(cx, cz, halfLen, halfWid, yaw, yMin, yMax) → {x, z, hit, nx, nz}       // the car: corrected centre + push direction
+collision.sweepCircleXZ(x0, z0, x1, z1, radius, yMin, yMax, mask?) → {x, z, hit, nx, nz}       // NPCs, traffic
+collision.all() → box[] · collision.count · collision.clear()
+collision.debug(on) · collision.debugOn        // emits 'collision:debug' {on}; a harness draws collision.all() (this module has no three.js)
 ```
+`moveCapsule(pos, delta, …)` takes plain `{x, y, z}` objects (a `Vector3` works) and returns a new position; it slides
+along walls, climbs steps up to 0.4 m, lands on floors, stops under ceilings and never tunnels. The caller owns gravity
+(`delta.y`). `createCollisionWorld()` gives the same object without a context (tests, tools).
 Defaults: boxes whose top is ≤ 0.3 m above the road (curbs, sidewalks) do not block vehicles; boxes shorter than
 1.5 m do not block the camera. Every box top is walkable. Raised floors (sidewalk slabs, pier deck, roof deck) are
 simply boxes whose top is the floor height.

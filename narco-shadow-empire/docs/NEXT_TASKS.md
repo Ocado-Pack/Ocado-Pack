@@ -24,7 +24,8 @@ the demo target is roughly 7k lines in total.
 4. **Materials** — **DONE (session 3).** `src/world/{texgen,textures,materials}.js` → `ctx.mats`, harness
    `dev/materials.html`, `tests/unit/texgen.test.mjs` (5), `tests/e2e/materials.e2e.cjs` (6 checks). Add further materials
    (tile floor, carpet, cardboard, water, car paint) when a builder needs them.
-5. **Actors core** *(next — start here)*: `src/core/input.js` (keyboard + mouse with pointer-lock and drag-look fallback, `setVirtual`
+5. **Actors core** *(in progress — `src/world/collision.js` is DONE with 8 unit tests; continue with input, zones,
+   player, camera, interact, character and the harness)*: `src/core/input.js` (keyboard + mouse with pointer-lock and drag-look fallback, `setVirtual`
    for tests), `src/world/collision.js` (AABB spatial hash, capsule move with step-up, raycast, oriented-box
    resolve for the car), `player.js`, `camera.js` (follow with wall collision, vehicle chase, cinematic pose,
    focus), `interact.js`, `zones.js`, `character.js` (replace the stub with a procedural humanoid + walk/run/idle).
