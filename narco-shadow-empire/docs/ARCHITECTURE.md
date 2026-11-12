@@ -279,11 +279,13 @@ Defaults: boxes whose top is ≤ 0.3 m above the road (curbs, sidewalks) do not 
 1.5 m do not block the camera. Every box top is walkable. Raised floors (sidewalk slabs, pier deck, roof deck) are
 simply boxes whose top is the floor height.
 
-### `ctx.zones` (`src/world/zones.js`)
+### `ctx.zones` (`src/world/zones.js`) — **implemented** (pure module, unit-tested in Node)
 ```js
 zones.add({id, rect, y0, y1, indoor, ambience}) · zones.current (Set of ids containing the player) · zones.indoor (0–1, smoothed)
-zones.isInside(id) · emits zone:enter / zone:exit
+zones.isInside(id) · zones.addAll(layout.ZONES) · zones.get(id) · zones.all() · zones.remove(id) · zones.ambience · zones.setProbe(fn|null) · zones.update(dt, snap?)
 ```
+Follows `ctx.player.position` (the camera when there is no player), leaves a zone 0.3 m later than it enters it, and
+names the ambience after the smallest zone the player is in. Emits `zone:enter` / `zone:exit`.
 
 ### `ctx.interact` (`src/world/interact.js`)
 ```js
@@ -302,7 +304,7 @@ On foot only. Shows the prompt through `ctx.ui.hud.showPrompt`, fires on the `in
 
 ## 6. Actors
 
-### `ctx.input` (`src/core/input.js`)
+### `ctx.input` (`src/core/input.js`) — **implemented** (state machine unit-tested in Node; browser events in `attach()`)
 ```js
 input.move {x, y}                 // x strafe (+right), y forward (+forward), |v| ≤ 1 — zero when !ctx.flow.worldInput
 input.look {dx, dy}               // look delta this frame (px-equivalent, sensitivity applied)
@@ -311,8 +313,12 @@ input.setVirtual({moveX, moveY, lookDX, lookDY, down:{action:boolean}})   // tou
 input.tap(action)                 // synthetic press (touch buttons, tests)
 input.pointerLocked · input.requestPointerLock() · input.exitPointerLock() · input.isTouch · input.lastDevice
 input.label(action) → 'E'         // for prompts
-input.endFrame()
+input.endFrame() · input.zoom (wheel steps this frame) · input.releaseAll()
+input.attach(target?, canvas?) → detach()          // real keyboard / mouse events; handleKey / handleMouseMove / handleWheel are the raw entry points
 ```
+Interface actions (`pause phone map tutor skip`) are reported even while a panel has the input; gameplay actions are
+not. Keys typed into an input field are ignored (except Esc); in menus and panels Tab, Space and the arrows are left to
+the page. `label()` is empty on touch.
 Actions: `run jump crouch interact vehicle phone map pause tutor headlights handbrake horn camera skip`.
 Keyboard: WASD/arrows, Shift run, Space jump/handbrake, C/Ctrl crouch, E interact, F enter/exit vehicle, Tab/P phone,
 M map, Esc pause, H tutor, L headlights, G horn, V camera, Enter skip. Mouse look with pointer lock, **and** a

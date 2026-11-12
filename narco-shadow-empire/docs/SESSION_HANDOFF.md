@@ -1,12 +1,12 @@
 # SESSION HANDOFF — NARCO: SHADOW EMPIRE (Operation Numbers)
 
-Snapshot: 2026-11-12, end of session 3 (rendering core, materials, collision) · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
+Snapshot: 2026-11-12, end of session 3 (rendering core, materials, collision, input, zones) · branch `claude/narco-shadow-empire-asvab-erthmj` · project root `narco-shadow-empire/`
 (all paths below are relative to it). Read with `docs/NEXT_TASKS.md` and `docs/ARCHITECTURE.md`.
 
 > **Honest one-line status:** the learning core (question engine for 4 of 20 topics, learner profile, tutor hint ladder,
 > session report) and the **rendering core** (renderer with honest 4K modes, post chain, sky / time of day / fog, rain
-> and particles, procedural PBR material library) are built and verified, and so is the static collision system —
-> 54 unit tests, 4 browser scenarios, self-test 11/11. **There is still no world, no character control, no vehicle, no UI and no mission.** The game is
+> and particles, procedural PBR material library) are built and verified, and so are three logic modules of the
+> actors core (collision, input, zones) — 59 unit tests, 4 browser scenarios, self-test 11/11. **There is still no world, no character control, no vehicle, no UI and no mission.** The game is
 > not playable: the page boots both cores and shows a status line; the 3D can only be seen in the harness pages
 > `dev/render.html` (boxes) and `dev/materials.html` (a showroom street of facades, panels, neon and signs).
 
@@ -110,7 +110,7 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | System | Status | Files |
 |---|---|---|
 | Dev server, screenshot/E2E harness | **Done, verified** (page loads, WebGL2 via SwiftShader ~5 FPS) | `tools/serve.mjs`, `tools/lib/harness.cjs`, `tools/shot.cjs`, `tools/e2e.cjs` |
-| Single-file bundler | **Done, verified** with both cores (682 KB incl. three.js, loads from `file://`, zero requests, self-test 11/11 inside the bundle) | `tools/build.mjs`, `dist/narco-shadow-empire.html` |
+| Single-file bundler | **Done, verified** with both cores (693 KB incl. three.js, loads from `file://`, zero requests, self-test 11/11 inside the bundle) | `tools/build.mjs`, `dist/narco-shadow-empire.html` |
 | Core: context, events, rng, storage (memory fallback), settings + quality presets, i18n, flow, loop, util, ltext, params | **Done, verified** — 7/7 unit tests pass | `src/core/*.js`, `tests/unit/core.test.mjs` |
 | District layout + anchors/stations | **Done, verified** by tests (anchors inside their rooms) | `src/world/layout.js` |
 | Contracts document | **Done** | `docs/ARCHITECTURE.md` |
@@ -130,9 +130,11 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | Rendering harness + screenshot matrix | **Done** | `dev/render.html`, `dev/render.shots.cjs`, `tests/e2e/render.e2e.cjs` |
 | Materials `ctx.mats`: 15 textured + 6 plain materials, paint / emissive / neon / glass, 5 facade styles with lit windows, canvas-text signs and labels, wetness (darkening, gloss, puddles) and night-only emissives | **Done, verified** — generator unit-tested (deterministic, seamless, ranges, speed); 7 showroom screenshots looked at (dry day, wet night, wall and ground close-ups); browser scenario with 6 checks. **Gaps:** no carpet / tile-floor / cardboard / water / car-paint materials yet (add when a builder needs them); CPU copies of the textures are kept (≈ 120 MB for the whole showroom on medium), which is what makes context-loss recovery work | `src/world/{texgen,textures,materials}.js`, `dev/materials.html` |
 | Light pool `ctx.lights` | **Not implemented** | planned `src/world/lights.js` |
-| Collision `ctx.collision`: AABB boxes in a spatial hash, `groundY`, `moveCapsule` (slide, 0.4 m step-up, landing, ceilings, no tunnelling), `raycast` with masks, `resolveBoxXZ` for the car, `sweepCircleXZ`, `addWalls` with door openings and lintels | **Done, verified** — 8 unit tests incl. a comparison with brute force on 400 random boxes; 7 deliberate breaks all caught. Not yet used by anything (no player, no world) and not registered in `src/main.js` | `src/world/collision.js`, `tests/unit/collision.test.mjs` |
+| Collision `ctx.collision` (registered in `src/main.js`, empty until builders add boxes): AABB boxes in a spatial hash, `groundY`, `moveCapsule` (slide, 0.4 m step-up, landing, ceilings, no tunnelling), `raycast` with masks, `resolveBoxXZ` for the car, `sweepCircleXZ`, `addWalls` with door openings and lintels | **Done, verified** — 8 unit tests incl. a comparison with brute force on 400 random boxes; 7 deliberate breaks all caught. Not yet used by anything (no player, no world) | `src/world/collision.js`, `tests/unit/collision.test.mjs` |
 | City block, warehouse, pier, garage, hotel/ops room | **Not implemented** | planned `src/world/{world,city,warehouse,pier,garage,hotel}.js` |
-| Input, player, camera, interact, zones, touch | **Not implemented** | planned `src/core/input.js`, `src/world/{player,camera,interact,zones}.js`, `src/ui/touch.js` |
+| Input `ctx.input`: keyboard map, press / release edges per frame, flow gating (interface actions pass, gameplay actions do not), mouse look + wheel, virtual stick / buttons / taps for touch and tests | **Done, verified** in Node (4 tests; 4 deliberate breaks caught). **Not verified:** the browser event layer (`attach()`: pointer lock, drag-look, focus loss) — it has no consumer yet; cover it in the player harness E2E. No gamepad | `src/core/input.js`, `tests/unit/input.test.mjs` |
+| Zones `ctx.zones`: enter / exit with hysteresis, smoothed `indoor`, ambience of the smallest zone, accepts `layout.ZONES` | **Done, verified** in Node (2 deliberate breaks caught). Registered but empty: the world builders add the zones | `src/world/zones.js` |
+| Player, camera, interact, character model, touch controls | **Not implemented** (`character.js` is still the capsule stub) | planned `src/world/{player,camera,interact}.js`, `src/ui/touch.js` |
 | Vehicle + dashboard telemetry | **Not implemented** | planned `src/world/{vehicle,carmodel}.js` |
 | NPCs, traffic, pedestrians | **Not implemented** | — |
 | UI: HUD, dialog/subtitles, documents, menus, pause, settings, phone, map | **Not implemented** | planned `src/ui/*`, `src/game/dialog.js` |
@@ -140,20 +142,20 @@ User's own study skills that were folded into the design (see ARCHITECTURE §10)
 | Missions, campaign, cinematics, save/load, app controller | **Not implemented** | planned `src/game/*` |
 | Audio | **Not implemented** | planned `src/core/audio.js` |
 | Context guard: thresholds 65 / 70 / 75 % of the context window, handoff verification, resume prompt | **Done, verified** — 7 simulation tests; on the real harness (separate headless process) SessionStart, UserPromptSubmit, PreToolUse deny, PostToolBatch and Stop all fired. Not verified live: the status line (no terminal UI in cloud sessions), PreCompact, and the one-time loop stop at 75 % | `.claude/settings.json`, `.claude/hooks/context-guard.{mjs,config.json,test.mjs}`, `docs/RESUME_PROMPT.md` |
-| Boot wiring | **Partial** — learning core + rendering core (ctx, math, profile, session, tutor, gfx, env, weather, selfTest). The loop is NOT started (nothing to show); `?norender=1` skips WebGL. No world, UI or missions | `src/main.js` |
+| Boot wiring | **Partial** — learning core + rendering core + first actor systems (ctx, math, profile, session, tutor, gfx, env, weather, mats, collision, zones, input, selfTest). The loop is NOT started (nothing to show); `?norender=1` skips WebGL. No world, UI or missions | `src/main.js` |
 
 ---
 
 ## 4. Current unfinished work (resume exactly here)
 
 **Nothing is half-done inside a file.** P0 tasks 1 (math engine), 2 (learner model), 3 (rendering core) and 4
-(materials) are complete; P0 task 5 (actors core) has its first module, collision, finished and tested. Everything is
-committed and pushed.
+(materials) are complete; P0 task 5 (actors core) has three of its modules finished and tested: collision, input and
+zones. Everything is committed and pushed.
 
-- **Last successful results:** `npm test` → 54 tests, 54 pass (7 core/layout, 9 math, 12 learning, 13 rendering,
-  5 texture generator, 8 collision); `node --test .claude/hooks/context-guard.test.mjs` → 7/7; `npm run e2e` → 4/4 scenarios
+- **Last successful results:** `npm test` → 59 tests, 59 pass (7 core/layout, 9 math, 12 learning, 13 rendering,
+  5 texture generator, 8 collision, 5 input + zones); `node --test .claude/hooks/context-guard.test.mjs` → 7/7; `npm run e2e` → 4/4 scenarios
   (learning on the dev page, learning in the single-file build from `file://`, rendering core with 18 checks,
-  materials with 6 checks); `npm run build` → 682 KB.
+  materials with 6 checks); `npm run build` → 693 KB.
 - **Current errors:** none known. The only console noise is Chromium's "GPU stall due to ReadPixels" warning, which
   comes from software WebGL screenshots, not from the game.
 - **How the tests were checked:** ten deliberate one-line breaks in the rendering core (4K rule, fixed-4K sizing,
@@ -164,19 +166,21 @@ committed and pushed.
   roughness) were all caught on the first run.
 
 **Exact next action — continue P0 task 5, actors core** (`docs/NEXT_TASKS.md`; spec in
-`docs/briefs/narco-actors.workflow.js`). Done: `src/world/collision.js`. Remaining, in this order:
-1. `src/core/input.js` → `ctx.input` (ARCHITECTURE §6): keyboard + mouse look with pointer lock and a drag-look
-   fallback, the action list, `setVirtual` / `tap` for tests and touch, `endFrame`. Keep the state machine free of DOM
-   (listeners attached in a separate `attach(target)` step) so the action mapping is unit-tested in Node.
-2. `src/world/zones.js` → `ctx.zones` (pure: `add`, `current`, `indoor` smoothed 0–1, `zone:enter` / `zone:exit`). The
-   rain already fades with `ctx.zones.indoor`.
-3. `src/world/player.js` (uses `collision.moveCapsule`; walk 1.8 m/s, run 5, jump ≈ 1 m, crouch) and
-   `src/world/camera.js` (third-person follow; pull the camera in with `collision.raycast(…, 'camera')` so it never
-   clips through walls; `focus`, `setPose`, `shake`), `interact.js`, and `character.js` (replace the capsule stub with
-   a procedural humanoid).
-4. Harness `dev/player.html` on the rendering core + `ctx.mats` + a few `collision.addBox` obstacles (walls, a curb,
-   a crate, a doorway from `addWalls`), with a self-check driven by `ctx.input.setVirtual` + `ctx.loop.fastForward`,
-   and an E2E scenario. Register `createCollision(ctx)` in `src/main.js` together with the player.
+`docs/briefs/narco-actors.workflow.js`). Done: `collision.js`, `input.js`, `zones.js`. Remaining, in this order:
+1. `src/world/player.js` → `ctx.player` (ARCHITECTURE §6): capsule r 0.35 / h 1.8 (crouch 1.1) moved with
+   `ctx.collision.moveCapsule`; camera-relative movement from `ctx.input.move` and `ctx.cameraRig.yaw`; walk 1.8 m/s,
+   run 5, crouch-walk 1.1; gravity 22 m/s²; jump ≈ 1 m with coyote time and buffering; states; `teleport(anchor | pos)`;
+   emits `player:step` / `jump` / `land`. Keep the motion maths free of three.js where it is easy, so a Node test can
+   walk the capsule around `createCollisionWorld()`.
+2. `src/world/camera.js` → `ctx.cameraRig`: third-person follow (pivot 1.55 m above the feet, distance 3.6 m, pitch
+   −35°…+65°), pulled in by `collision.raycast(pivot, dir, dist, 'camera')` with a 0.25 m margin, `focus`, `setPose`,
+   `shake`; honours `fov`, `mouseSens`, `invertY`, `reducedMotion`.
+3. `src/world/interact.js` → `ctx.interact`, then `src/world/character.js` (replace the capsule stub with a procedural
+   humanoid: walk / run / idle / crouch / jump).
+4. Harness `dev/player.html` on the rendering core + `ctx.mats` with obstacles from `collision.addBox` / `addWalls`
+   (a wall, a curb, a crate, a doorway, an awning) and one indoor zone; a self-check driven by
+   `ctx.input.setVirtual` + `ctx.loop.fastForward`; an E2E scenario that also presses real keys through Playwright
+   (`page.keyboard`) to cover `input.attach()`; look at screenshots of the character and of the camera against a wall.
 5. Then P0 tasks 6–13 in order. The first thing that needs `ctx.lights` is the city (task 6): decide there whether the
    lean demo gets the pooled light system or a fixed handful of real lights (`settings.maxLights`).
 
@@ -200,6 +204,9 @@ committed and pushed.
 - Collision: `ctx.collision.moveCapsule(pos, delta, 0.35, 1.8)` is the whole character-vs-world step (the caller adds
   gravity to `delta.y` and zeroes its fall speed when `grounded`); `raycast(origin, dir, max, 'camera')` for the camera
   boom; `resolveBoxXZ` for the car; builders call `addBox` / `addRect` / `addWalls` (door openings with lintels).
+- Input: `ctx.input.move` / `look` / `down(a)` / `pressed(a)`; tests and touch drive it with `setVirtual({moveY: 1})`
+  and `tap('interact')`; the UI listens to the `input:action` event. Zones: `ctx.zones.addAll(ZONES)` in the world
+  builder, `ctx.zones.indoor` already fades the rain.
 - Light levels that work with the exposure and bloom: street lamp ≈ 130 cd at 5.7 m, neon spill ≈ 20 cd, emissive
   intensity 5–7 for tubes and lamp heads. Three times that washed the frame out (seen in the first screenshots).
 - A custom `ShaderMaterial` must end with `#include <tonemapping_fragment>` + `#include <colorspace_fragment>`, or it
