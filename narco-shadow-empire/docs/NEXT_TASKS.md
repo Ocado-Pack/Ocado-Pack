@@ -18,7 +18,7 @@ the demo target is roughly 7k lines in total.
    (`createLearning(ctx, {now})`), `tests/unit/learning.test.mjs`; plus `src/game/selftest.js` and two browser
    scenarios in `tests/e2e/`. Still open and deferred to P1: `exam.js`, `explain.js`.
 3. **Rendering core** — **DONE (session 3).** `src/world/{renderer,post,resolution,environment,skymodel,weather}.js`,
-   harness `dev/render.html` + `dev/render.shots.cjs`, `tests/unit/render.test.mjs` (13), `tests/e2e/render.e2e.cjs` (17
+   harness `dev/render.html` + `dev/render.shots.cjs`, `tests/unit/render.test.mjs` (13), `tests/e2e/render.e2e.cjs` (18
    checks), self-test extended to 11. Wired into `src/main.js`. Open items moved to P1: rain blocked by roofs, a frame-rate
    pass on a real GPU, a look at the dust / spray emitters and at AO.
 4. **Materials** *(next — start here)*: `src/world/textures.js` + `materials.js` — compact procedural set: wet asphalt, sidewalk,

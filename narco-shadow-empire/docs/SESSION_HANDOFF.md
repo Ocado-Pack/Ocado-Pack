@@ -148,7 +148,7 @@ pushed.
 
 - **Last successful results:** `npm test` → 41 tests, 41 pass (7 core/layout, 9 math, 12 learning, 13 rendering);
   `node --test .claude/hooks/context-guard.test.mjs` → 7/7; `npm run e2e` → 3/3 scenarios (learning on the dev page,
-  learning in the single-file build from `file://`, rendering core with 17 checks); `npm run build` → 664 KB.
+  learning in the single-file build from `file://`, rendering core with 18 checks); `npm run build` → 664 KB.
 - **Current errors:** none known. The only console noise is Chromium's "GPU stall due to ReadPixels" warning, which
   comes from software WebGL screenshots, not from the game.
 - **How the tests were checked:** ten deliberate one-line breaks in the rendering core (4K rule, fixed-4K sizing,

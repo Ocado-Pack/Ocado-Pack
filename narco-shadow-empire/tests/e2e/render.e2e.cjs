@@ -38,11 +38,15 @@ module.exports = {
       h.gfx.scene.traverse((o) => { if (o.material && o.material.emissiveIntensity > 1) { glow.push([o.material, o.material.emissiveIntensity]); o.material.emissiveIntensity = 0; } });
       const look = (time, weather, cam) => { h.apply({ time, weather, cam }); e.setWetness(0); const s = h.gfx.sample(6); return { luma: +s.luma.toFixed(3), min: +s.min.toFixed(3), max: +s.max.toFixed(3) }; };
       const r = { noon: look(12.5, 'clear', 'street'), night: look(1, 'clear', 'street'), nightSky: look(1, 'clear', 'sky'), noonSky: look(12.5, 'clear', 'sky'), events: ev.slice(), isNight: [] };
-      ev.length = 0; e.setTime(18.9, { instant: true }); e.setClockRate(6); h.ctx.loop.fastForward(3); r.isNight = [e.isNight, +e.hour.toFixed(2)]; r.dusk = ev.slice(); e.setClockRate(0); off();
+      ev.length = 0; e.setTime(18.9, { instant: true }); e.setClockRate(6); h.ctx.loop.fastForward(3); r.isNight = [e.isNight, +e.hour.toFixed(2)]; r.dusk = ev.slice(); e.setClockRate(0);
+      // a timed change runs the clock FORWARD (through midnight) and lands exactly on the hour asked for
+      e.setTime(22.5, { instant: true }); ev.length = 0; const seen = []; const offT = h.ctx.events.on('env:time', (x) => seen.push(x.hour)); e.setTime(6.5); h.ctx.loop.fastForward(1.5); const mid = e.hour;
+      h.ctx.loop.fastForward(8); offT(); r.lapse = [+e.hour.toFixed(3), ev.slice(), e.isNight, mid > 22.5 || mid < 6.5, seen.length > 0 && seen.length <= 20]; off();
       h.lamps.forEach((l, i) => { l.light.intensity = power[i]; }); glow.forEach(([m, v]) => { m.emissiveIntensity = v; }); return r; });
     checks.dayIsBrighterThanNight = d.time.noon.luma > d.time.night.luma * 3 && d.time.noonSky.luma > d.time.nightSky.luma * 4;
     checks.nightIsNotPitchBlack = d.time.night.luma > 0.05 && d.time.night.max > 0.12 && d.time.night.luma < 0.25;
     checks.nightEventAtDusk = same(d.time.dusk, [true]) && d.time.isNight[0] === true && d.time.isNight[1] > 19;
+    checks.timedTimeChange = same(d.time.lapse, [6.5, [false], false, true, true]);
 
     // 5. weather: rain is drawn only when it rains, follows the preset density, wets the ground gradually, fog thickens
     d.rain = await evalJs(() => { const h = window.__h, e = h.env, w = h.weather, S = () => w.stats().streaks, out = {};
