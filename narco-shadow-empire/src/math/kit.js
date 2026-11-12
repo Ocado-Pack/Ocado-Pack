@@ -7,7 +7,11 @@ import { createRng } from '../core/rng.js';
 export const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) { const t = a % b; a = b; b = t; } return a || 1; };
 export const lcm = (a, b) => Math.abs(a * b) / gcd(a, b);
 export const frac = (n, d = 1) => { if (d === 0) throw new Error('frac: zero denominator'); if (d < 0) { n = -n; d = -d; } const g = gcd(n, d); return { n: n / g, d: d / g }; };
-export const fromNumber = (v) => { const k = 1e6; return frac(Math.round(v * k), k); };
+/** Float -> exact rational. Recovers a small denominator when the float is one (25/3, 0.1 + 0.2); otherwise 6 decimal places. */
+export const fromNumber = (v) => {
+  for (let d = 2; d <= 1000; d++) { const n = Math.round(v * d); if (Math.abs(n / d - v) < 1e-9) return frac(n, d); }
+  return frac(Math.round(v * 1e6), 1e6);
+};
 export const toFrac = (v) => (typeof v === 'number' ? (Number.isInteger(v) ? frac(v, 1) : fromNumber(v)) : frac(v.n, v.d));
 export const fAdd = (a, b) => frac(a.n * b.d + b.n * a.d, a.d * b.d);
 export const fSub = (a, b) => frac(a.n * b.d - b.n * a.d, a.d * b.d);
@@ -22,9 +26,10 @@ export const MINUS = '−', TIMES = '×', DIV = '÷';
 export const fmtInt = (n) => (n < 0 ? MINUS : '') + String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 export function fmtNum(v, places = 2) {
   if (Number.isInteger(v)) return fmtInt(v);
-  const s = Math.abs(v).toFixed(places).replace(/0+$/, '').replace(/\.$/, '');
+  const fixed = Math.abs(v).toFixed(places);
+  const s = fixed.includes('.') ? fixed.replace(/0+$/, '').replace(/\.$/, '') : fixed;
   const [i, f] = s.split('.');
-  return (v < 0 ? MINUS : '') + fmtInt(Number(i)) + (f ? '.' + f : '');
+  return (v < 0 && Number(s) !== 0 ? MINUS : '') + fmtInt(Number(i)) + (f ? '.' + f : '');
 }
 export const fmtFrac = (f) => (f.d === 1 ? fmtInt(f.n) : (f.n < 0 ? MINUS : '') + Math.abs(f.n) + '/' + f.d);
 export function fmtMixed(f) {
@@ -32,7 +37,11 @@ export function fmtMixed(f) {
   const w = Math.trunc(Math.abs(f.n) / f.d), r = Math.abs(f.n) % f.d;
   return (f.n < 0 ? MINUS : '') + w + ' ' + r + '/' + f.d;
 }
-export const fmtMoney = (v) => (v < 0 ? MINUS : '') + '$' + (Number.isInteger(v) ? fmtInt(Math.abs(v)) : fmtInt(Math.trunc(Math.abs(v))) + '.' + Math.abs(v).toFixed(2).split('.')[1]);
+/** "$1,200" / "$12.50" - rounded to whole cents first, so 19.999999999999996 prints as $20. */
+export function fmtMoney(v) {
+  const cents = Math.round(Math.abs(v) * 100), c = cents % 100;
+  return (v < 0 && cents ? MINUS : '') + '$' + fmtInt((cents - c) / 100) + (c ? '.' + String(c).padStart(2, '0') : '');
+}
 const W_EN = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
 const W_ES = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve', 'veinte'];
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -67,7 +76,7 @@ export const ans = {
   /** exact fraction n/d (shown in lowest terms, mixed when > 1 if `mixed`) */
   frac: (n, d, unit, mixed = false) => { const f = frac(n, d); return { type: 'fraction', value: fNum(f), frac: f, unit, nonNegative: true, fmt: (x) => withUnit((mixed ? fmtMixed : fmtFrac)(toFrac(x)), unit, 2), ok: () => true }; },
   /** value of a variable: display "x = 9" */
-  x: (v, name = 'x') => ({ type: 'number', value: v, varName: name, fmt: (x) => L(name + ' = ' + (Number.isInteger(x) ? fmtInt(x) : fmtMixed(toFrac(x)))), ok: (x) => Number.isFinite(x), accept: [name + '=' + v] }),
+  x: (v, name = 'x') => ({ type: 'number', value: v, varName: name, fmt: (x) => L(name + ' = ' + (Number.isInteger(x) ? fmtInt(x) : fmtMixed(toFrac(x)))), ok: (x) => Number.isInteger(x) || !Number.isInteger(v), accept: [name + '=' + v] }),
   /** non-numeric answer (expression, inequality): multiple choice only */
   text: (lt) => ({ type: 'text', text: lt, fmt: (x) => x, ok: () => true }),
 };
@@ -88,7 +97,8 @@ export function defineTemplate(tpl) {
 }
 export const allTemplates = () => TEMPLATES;
 
-const sig = (id, p) => id + '|' + JSON.stringify(p, Object.keys(p).sort());
+const canon = (v) => (Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+const sig = (id, p) => id + '|' + JSON.stringify(canon(p));
 const keyOf = (v) => (typeof v === 'number' ? String(Math.round(v * 1e6) / 1e6) : JSON.stringify(v));
 
 /** Assemble a full Question (contract 7.1) from a template + params. Deterministic for (template, params, seed). */
@@ -97,20 +107,25 @@ export function assemble(tpl, params, seed, level) {
   const a = p.answer;
   const rng = createRng((seed ^ 0x5bd1e995) >>> 0);
   const isText = a.type === 'text';
-  const correctKey = isText ? pickLang(a.text, 'en') : keyOf(a.value);
-  const seen = new Set([correctKey]);
+  if (!isText && (!Number.isFinite(a.value) || (a.nonNegative && a.value < 0) || !a.ok(a.value))) throw new Error(`${tpl.id}: the answer ${a.value} does not fit its own answer type`);
+  const seen = new Set([isText ? pickLang(a.text, 'en') : keyOf(a.value)]);
   const seenText = new Set([pickLang(isText ? a.text : a.fmt(a.value), 'en')]);
-  const wrongs = [];
+  const wrongs = [], misconceptions = [];
   for (const w of p.wrong || []) {
+    if (!w) continue;                                   // templates may list a conditional mistake as null
     const val = isText ? w.text : w.value;
-    if (val === undefined || val === null) continue;
-    if (!isText && (!Number.isFinite(val) || (a.nonNegative && val < 0) || !a.ok(val))) continue;
+    if (val === undefined || val === null || (!isText && !Number.isFinite(val))) continue;
     const k = isText ? pickLang(val, 'en') : keyOf(val);
-    const txt = pickLang(isText ? val : a.fmt(val), 'en');
-    if (seen.has(k) || seenText.has(txt)) continue;
-    seen.add(k); seenText.add(txt);
-    wrongs.push({ value: isText ? undefined : val, text: isText ? val : a.fmt(val), tag: w.tag || 'slip', why: w.why });
-    if (wrongs.length === 3) break;
+    if (seen.has(k)) continue;                          // same as the answer, or as an earlier mistake
+    seen.add(k);
+    const tag = w.tag || 'slip';
+    if (!isText) misconceptions.push({ value: val, tag, why: w.why });
+    // shown as a choice only when it fits next to the correct answer (sign, whole number ...) and there is room
+    if (wrongs.length === 3 || (!isText && ((a.nonNegative && val < 0) || !a.ok(val)))) continue;
+    const text = isText ? val : a.fmt(val), txt = pickLang(text, 'en');
+    if (seenText.has(txt)) continue;
+    seenText.add(txt);
+    wrongs.push({ value: isText ? undefined : val, text, tag, why: w.why });
   }
   if (!isText) {
     const base = a.value, intLike = Number.isInteger(base);
@@ -141,7 +156,7 @@ export function assemble(tpl, params, seed, level) {
     entry: isText ? 'choice' : (p.entry || 'number'), choices,
     hints: p.hints, solution: { steps: p.steps, final: p.final || t('Answer: {a}', 'Respuesta: {a}', { a: display }) },
     beginner: p.beginner, formula: p.formula, trick: p.trick,
-    visual: p.visual || { type: 'none', params: {} }, rookie: p.rookie, estSeconds: p.estSeconds || 60,
+    visual: p.visual || { type: 'none', params: {} }, rookie: p.rookie, misconceptions, estSeconds: p.estSeconds || 60,
   };
 }
 
@@ -172,6 +187,10 @@ export function validateQuestion(qn, tpl) {
   if (!both(qn.beginner)) e.push('beginner explanation must be bilingual');
   if (!both(qn.formula)) e.push('formula must be bilingual');
   if (qn.rookie && (!Array.isArray(qn.rookie.lines) || !(qn.rookie.wrongIndex >= 0 && qn.rookie.wrongIndex < qn.rookie.lines.length) || !both(qn.rookie.why))) e.push('bad rookie block');
+  if (qn.misconceptions) {
+    if (!Array.isArray(qn.misconceptions) || !qn.misconceptions.every((m) => Number.isFinite(m.value) && m.tag && both(m.why))) e.push('misconceptions need a finite value, a tag and a bilingual why');
+    else if (qn.answer && qn.misconceptions.some((m) => Math.abs(m.value - qn.answer.value) < 1e-9)) e.push('a misconception equals the answer');
+  }
   if (tpl && tpl.check && qn.answer && qn.answer.type !== 'text') {
     let v;
     try { v = tpl.check(qn.params); } catch (err) { e.push('check() threw: ' + err.message); }
@@ -179,8 +198,12 @@ export function validateQuestion(qn, tpl) {
   }
   // leak check: the final numeric answer must not be given away by the beginner text or the first two hints
   if (qn.answer && qn.answer.type !== 'text') {
-    const token = fmtNum(Math.abs(qn.answer.value), 4);
-    const re = new RegExp('(^|[^\\d.,/])' + token.replace(/[.]/g, '\\.') + '($|[^\\d/]|[.,](?!\\d))');
+    const tokens = [String(Math.round(Math.abs(qn.answer.value) * 1e4) / 1e4)];
+    if (qn.answer.frac && qn.answer.frac.d !== 1) tokens.push(Math.abs(qn.answer.frac.n) + '/' + qn.answer.frac.d);
+    // compare plain numerals: "1,200" -> "1200", "2.50" -> "2.5"; a number is a hit only when it stands alone
+    const plain = (str) => String(str).replace(/(\d),(?=\d{3}(?!\d))/g, '$1').replace(/(\.\d*?)0+(?!\d)/g, '$1');
+    const res = tokens.map((tk) => new RegExp('(^|[^\\d.,/])' + tk.replace('.', '\\.') + '($|[^\\d/.,]|[.,](?!\\d))'));
+    const re = { test: (str) => res.some((r) => r.test(plain(str))) };
     const inPrompt = re.test(qn.prompt.en) || (qn.expr && re.test(qn.expr));
     if (!inPrompt) for (const [name, lt] of [['beginner', qn.beginner], ['hint 1', qn.hints && qn.hints[0]], ['hint 2', qn.hints && qn.hints[1]]]) {
       if (lt && (re.test(lt.en) || re.test(lt.es))) e.push(name + ' leaks the answer');
@@ -190,11 +213,11 @@ export function validateQuestion(qn, tpl) {
 }
 
 // ---- answer parsing / checking ----------------------------------------------------------------------------
-/** Parse learner input into an exact rational, or null. Accepts 40, 40.0, -3, 1/2, 1 1/2, .5, 25%, $1,200.50, "40 cases", "x = 9". */
+/** Parse learner input into an exact rational, or null. Accepts 40, 40.0, -3, 1/2, 1 1/2, .5, 25%, $1,200.50, "40 cases", "x = 9", "= 9". */
 export function parseAnswer(raw) {
   let s = String(raw ?? '').trim().toLowerCase();
   if (!s) return null;
-  s = s.replace(/[−–]/g, '-').replace(/\$/g, '').replace(/(\d),(?=\d{3}\b)/g, '$1').replace(/^[a-z]\s*=\s*/, '').trim();
+  s = s.replace(/[−–]/g, '-').replace(/\$/g, '').replace(/(\d),(?=\d{3}\b)/g, '$1').replace(/^(?:[a-z]\s*)?=\s*/, '').trim();
   let m = s.match(/^([+-]?)\s*(\d+)\s+(\d+)\s*\/\s*(\d+)(.*)$/);
   let f = null, rest = '';
   if (m) { if (+m[4] === 0) return null; f = frac((m[1] === '-' ? -1 : 1) * (+m[2] * +m[4] + +m[3]), +m[4]); rest = m[5]; }
@@ -205,27 +228,29 @@ export function parseAnswer(raw) {
     f = frac((m[1] === '-' ? -1 : 1) * Math.round(parseFloat(m[2]) * Math.pow(10, dec)), Math.pow(10, dec)); rest = m[3];
   } else return null;
   rest = rest.trim();
-  if (rest && /\d/.test(rest.replace(/[a-z°]\s*[23²³]\b/g, ''))) return null; // trailing junk with digits ("40 12")
+  if (/[+=*×÷()<>]/.test(rest)) return null;          // an expression ("3 +", "40 = 40"), not a number
+  // trailing words are ignored ("40 cases"), trailing digits are not ("40 12", "3 x 2", "1e3") - except a unit exponent ("9 ft2")
+  if (rest && /\d/.test(rest.replace(/\b(?:mm|cm|km|m|in|ft|yd|mi)\s?\^?[23]\b/g, ''))) return null;
   return f;
 }
 
 const NORM = (s) => String(s).toLowerCase().replace(/[−–]/g, '-').replace(/\s+/g, '');
 /**
  * Check an answer. input = {choice: index} | {text: string}.
- * -> {correct, normalized, choice?, why?, parseError?}
+ * -> {correct, normalized, value?, choice?, tag?, why?, parseError?}   (tag + why name the mistake behind a wrong value)
  */
 export function checkAnswer(qn, input) {
   if (input && Number.isInteger(input.choice)) {
     const c = qn.choices[input.choice];
     if (!c) return { correct: false, parseError: L('Pick one of the four answers.', 'Elige una de las cuatro respuestas.') };
-    return { correct: !!c.correct, normalized: pickLang(c.text, 'en'), choice: c, why: c.correct ? undefined : c.why, value: c.value };
+    return { correct: !!c.correct, normalized: pickLang(c.text, 'en'), choice: c, tag: c.correct ? undefined : c.tag, why: c.correct ? undefined : c.why, value: c.value };
   }
   const text = input && input.text !== undefined ? String(input.text) : '';
   if (qn.answer.accept && qn.answer.accept.some((a) => NORM(a) === NORM(text))) return { correct: true, normalized: NORM(text), value: qn.answer.value };
   if (qn.answer.type === 'text') {
     const c = qn.choices.find((x) => NORM(pickLang(x.text, 'en')) === NORM(text) || NORM(pickLang(x.text, 'es')) === NORM(text));
     if (!c) return { correct: false, parseError: L('Choose one of the listed answers.', 'Elige una de las respuestas de la lista.') };
-    return { correct: !!c.correct, normalized: NORM(text), choice: c, why: c.correct ? undefined : c.why };
+    return { correct: !!c.correct, normalized: NORM(text), choice: c, tag: c.correct ? undefined : c.tag, why: c.correct ? undefined : c.why };
   }
   const f = parseAnswer(text);
   if (!f) return { correct: false, parseError: L('Enter a number (for example 40, 2.5 or 3/4).', 'Escribe un número (por ejemplo 40, 2.5 o 3/4).') };
@@ -234,8 +259,10 @@ export function checkAnswer(qn, input) {
   const correct = fEq(f, qn.answer.frac) || Math.abs(value - qn.answer.value) <= Math.max(tol, 1e-9);
   const out = { correct, normalized: fmtMixed(f), value };
   if (!correct) {
-    const c = qn.choices.find((x) => !x.correct && Math.abs(x.value - value) < 1e-9);
-    if (c) { out.choice = c; out.why = c.why; }
+    const same = (x) => Math.abs(x.value - value) < 1e-9;
+    const c = qn.choices.find((x) => !x.correct && same(x)), m = (qn.misconceptions || []).find(same) || c;
+    if (c) out.choice = c;
+    if (m) { out.tag = m.tag; out.why = m.why; }
   }
   return out;
 }

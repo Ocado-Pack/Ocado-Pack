@@ -2,6 +2,9 @@
 import { defineTemplate, ans, steps5, t, N, numWord, fmtInt, fmtMoney, L, TIMES, MINUS, DIV } from '../../kit.js';
 
 const CASES = N('case', 'cases', 'caja', 'cajas'), BOXES = N('box', 'boxes', 'caja', 'cajas'), CRATES = N('crate', 'crates', 'cajón', 'cajones'), DRUMS = N('drum', 'drums', 'tambor', 'tambores');
+const BORROW = L('Re-check the subtraction; a regrouping (borrowing) slip changes the tens digit.', 'Revisa la resta; un error al reagrupar (pedir prestado) cambia las decenas.');
+const borrows = (from, take) => from % 10 < take % 10;   // does from − take need regrouping in the ones place?
+const RECHECK_DIV = L('Re-check the division: multiply your answer by the carton size and compare with the total.', 'Revisa la división: multiplica tu respuesta por el tamaño del cartón y compárala con el total.');
 const LOAD = {
   trucks: { unit: CASES, en: '{G} trucks carry {per} equipment cases each. {R} cases are removed. How many remain?', es: '{G} camiones llevan {per} cajas de equipo cada uno. Se retiran {r} cajas. ¿Cuántas quedan?', g: L('trucks', 'camiones') },
   shelves: { unit: BOXES, en: '{G} shelves hold {per} boxes each. {R} boxes are taken to the dock. How many boxes are left on the shelves?', es: '{G} estantes tienen {per} cajas cada uno. Se llevan {r} cajas al muelle. ¿Cuántas cajas quedan en los estantes?', g: L('shelves', 'estantes') },
@@ -14,7 +17,7 @@ export default [
     id: 'ar.ops.loadout', topic: 'ar.ops', levels: [1, 2], themes: ['warehouse'],
     params(rng, level) {
       const groups = rng.int(2, level === 1 ? 5 : 9), per = rng.int(level === 1 ? 6 : 12, level === 1 ? 20 : 45);
-      return { groups, per, removed: rng.int(3, Math.min(groups * per - 2, level === 1 ? 20 : 60)), context: rng.pick(Object.keys(LOAD)), words: false };
+      return { groups, per, removed: rng.int(3, per - 1), context: rng.pick(Object.keys(LOAD)), words: false };
     },
     build(p) {
       const c = LOAD[p.context] || LOAD.trucks, total = p.groups * p.per, a = total - p.removed;
@@ -22,25 +25,26 @@ export default [
       return {
         prompt: t(c.en, c.es, v), answer: ans.int(a, c.unit), estSeconds: 45,
         wrong: [
-          { value: total, tag: 'forgot-subtract', why: t('That is the total before anything was removed. You still have to take away the {rm} that left.', 'Ese es el total antes de retirar algo. Aún debes restar los {rm} que salieron.', v) },
+          { value: total, tag: 'forgot-subtract', why: t('That is the total before anything was removed. You still have to take away the {rm} that left.', 'Ese es el total antes de retirar algo. Aún debes restar {rm}.', v) },
           { value: p.groups * (p.per - p.removed), tag: 'subtract-first', why: t('You subtracted {rm} from every group. Only {rm} {unit} were removed in total, so multiply first, then subtract once.', 'Restaste {rm} de cada grupo. Solo se retiraron {rm} {unit} en total: primero multiplica y luego resta una sola vez.', v) },
           { value: total + p.removed, tag: 'added-instead', why: t('"Removed" means take away. You added {rm} instead of subtracting it.', '"Retirar" significa quitar. Sumaste {rm} en lugar de restarlo.', v) },
-          { value: p.groups + p.per - p.removed, tag: 'added-groups', why: t('"{per} each" for {g} {gs} means {g} groups of {per}: multiply, do not add.', '"{per} cada uno" para {g} {gs} significa {g} grupos de {per}: multiplica, no sumes.', v) },
+          { value: p.groups + p.per - p.removed, tag: 'added-groups', why: t('"{per} each" for {g} {gs} means {g} groups of {per}: multiply, do not add.', '{g} {gs} con {per} en cada grupo son {g} grupos de {per}: multiplica, no sumes.', v) },
+          borrows(total, p.removed) ? { value: a + 10, tag: 'borrow-error', why: BORROW } : null,
         ],
         hints: [
-          t('Work out how many {unit} there were before any left. The word "each" signals equal groups.', 'Calcula cuántas {unit} había antes de que saliera alguna. La palabra "cada" indica grupos iguales.', v),
-          t('Total = number of groups {x} amount in each. Remaining = total {m} removed.', 'Total = número de grupos {x} cantidad en cada uno. Restantes = total {m} retiradas.', { x: TIMES, m: MINUS }),
-          t('Start with {g} {x} {per} = {total}. Now take away the {rm} that were removed.', 'Empieza con {g} {x} {per} = {total}. Ahora quita las {rm} que se retiraron.', { ...v, x: TIMES }),
+          t('Work out how many {unit} there were before any left. The word "each" signals equal groups.', 'Calcula primero el total de {unit} antes de que se retirara nada. La palabra "cada" indica grupos iguales.', v),
+          t('Total = number of groups {x} amount in each. Remaining = total {m} removed.', 'Total = número de grupos {x} cantidad en cada grupo. Lo que queda = total {m} lo retirado.', { x: TIMES, m: MINUS }),
+          t('Start with {g} {x} {per} = {total}. Now take away the {rm} that were removed.', 'Empieza con {g} {x} {per} = {total}. Ahora resta {rm}, lo que se retiró.', { ...v, x: TIMES }),
         ],
         steps: steps5(
-          t('Find how many {unit} are left after some are removed.', 'Halla cuántas {unit} quedan después de retirar algunas.', v),
-          t('{g} {gs}, {per} {unit} in each, {rm} removed.', '{g} {gs}, {per} {unit} en cada uno, {rm} retiradas.', v),
+          t('Find how many {unit} are left after some are removed.', 'Halla el número de {unit} que quedan después del retiro.', v),
+          t('{g} {gs}, {per} {unit} in each, {rm} removed.', '{g} {gs}, {per} {unit} en cada grupo; se retiran {rm}.', v),
           t('Equal groups {a1} multiply for the total; "removed" {a1} subtract: {g} {x} {per} {m} {rm}.', 'Grupos iguales {a1} multiplica para el total; "retirar" {a1} resta: {g} {x} {per} {m} {rm}.', { ...v, x: TIMES, m: MINUS, a1: '→' }),
           t('{g} {x} {per} = {total}. Then {total} {m} {rm} = {a}.', '{g} {x} {per} = {total}. Luego {total} {m} {rm} = {a}.', { ...v, x: TIMES, m: MINUS }),
           t('Add back what left: {a} + {rm} = {total}, the full load. It checks.', 'Suma lo que salió: {a} + {rm} = {total}, la carga completa. Coincide.', v),
         ),
-        beginner: t('Picture each of the {gs} as an equal stack. Counting equal stacks is repeated addition, and multiplying is the fast way to do it. Once you know the whole pile, removing some is a simple take-away.', 'Imagina cada uno de los {gs} como una pila igual. Contar pilas iguales es una suma repetida, y multiplicar es la forma rápida. Cuando ya conoces el montón completo, retirar algunas es una resta sencilla.', v),
-        formula: t('remaining = (groups {x} each) {m} removed', 'restantes = (grupos {x} cada uno) {m} retiradas', { x: TIMES, m: MINUS }),
+        beginner: t('Picture each of the {gs} as an equal stack. Counting equal stacks is repeated addition, and multiplying is the fast way to do it. Once you know the whole pile, removing some is a simple take-away.', 'Imagina que cada grupo ({gs}) es una pila del mismo tamaño. Contar pilas iguales es una suma repetida, y multiplicar es la forma rápida. Cuando ya conoces el montón completo, retirar una parte es una resta sencilla.', v),
+        formula: t('remaining = (groups {x} each) {m} removed', 'lo que queda = (grupos {x} cantidad por grupo) {m} lo retirado', { x: TIMES, m: MINUS }),
         trick: L('"Each" = multiply. "Removed / left / remain" = subtract.', '"Cada" = multiplica. "Retirar / quedan" = resta.'),
         visual: { type: 'bars', params: { values: Array.from({ length: p.groups }, (_, i) => ({ label: L(String(i + 1)), value: p.per })), mode: 'total', removed: p.removed } },
         rookie: {
@@ -56,7 +60,7 @@ export default [
     id: 'ar.ops.restock', topic: 'ar.ops', levels: [1, 2, 3], themes: ['warehouse'],
     params(rng, level) {
       const start = rng.int(20, level === 1 ? 60 : 240), added = rng.int(8, level === 1 ? 30 : 120);
-      return { start, added, shipped: rng.int(5, start + added - 3), second: level >= 3 ? rng.int(4, 40) : 0 };
+      return { start, added, shipped: rng.int(5, start - 1), second: level >= 3 ? rng.int(4, 40) : 0 };
     },
     build(p) {
       const a = p.start + p.added - p.shipped + p.second, v = { ...p, a, mid: p.start + p.added, m: MINUS };
@@ -68,6 +72,8 @@ export default [
           { value: p.start + p.added + p.shipped + p.second, tag: 'added-shipped', why: L('Shipped pallets leave the room, so they are subtracted, not added.', 'Las tarimas despachadas salen del almacén: se restan, no se suman.') },
           { value: p.start - p.shipped + p.second, tag: 'ignored-delivery', why: t('You left out the delivery of {added}.', 'Olvidaste la entrega de {added}.', v) },
           { value: p.start + p.added, tag: 'forgot-subtract', why: t('That is the count before {shipped} were shipped out.', 'Ese es el conteo antes de despachar {shipped}.', v) },
+          p.second ? { value: p.start + p.added - p.shipped, tag: 'stopped-early', why: t('You stopped before the {second} pallets that arrived later.', 'Te detuviste antes de las {second} tarimas que llegaron después.', v) } : null,
+          borrows(p.start + p.added, p.shipped) ? { value: a + 10, tag: 'borrow-error', why: BORROW } : null,
         ],
         hints: [
           L('Track the count like a running balance: things coming in raise it, things going out lower it.', 'Lleva la cuenta como un saldo: lo que entra la sube, lo que sale la baja.'),
@@ -103,10 +109,10 @@ export default [
           : t('A crew packs {total} radios into cartons that hold {per} radios each. How many cartons do they need?', 'Un equipo empaca {total} radios en cartones de {per} radios cada uno. ¿Cuántos cartones necesitan?', v),
         answer: ans.int(p.groups, N('carton', 'cartons', 'cartón', 'cartones')), estSeconds: 50,
         wrong: [
-          { value: p.groups + 1, tag: 'rounded-up', why: L('The question asks for completely filled cartons. A partly filled carton does not count.', 'La pregunta pide cartones completamente llenos. Un cartón a medias no cuenta.') },
+          p.extra ? { value: p.groups + 1, tag: 'rounded-up', why: L('The question asks for completely filled cartons. A partly filled carton does not count.', 'La pregunta pide cartones completamente llenos. Un cartón a medias no cuenta.') } : { value: p.groups + 1, tag: 'slip', why: RECHECK_DIV },
           { value: total - p.per, tag: 'subtracted', why: L('Sharing into equal groups is division, not subtraction.', 'Repartir en grupos iguales es dividir, no restar.') },
           { value: total * p.per, tag: 'multiplied', why: L('Multiplying makes the amount bigger. Packing a fixed total into equal cartons means dividing.', 'Multiplicar agranda la cantidad. Empacar un total fijo en cartones iguales significa dividir.') },
-          { value: p.groups - 1, tag: 'slip', why: L('Re-check the division: multiply your answer by the carton size and compare with the total.', 'Revisa la división: multiplica tu respuesta por el tamaño del cartón y compárala con el total.') },
+          { value: p.groups - 1, tag: 'slip', why: RECHECK_DIV },
         ],
         hints: [
           L('You are sharing one total into equal-sized groups. Which operation does that?', 'Estás repartiendo un total en grupos del mismo tamaño. ¿Qué operación hace eso?'),
@@ -180,7 +186,9 @@ export default [
           { value: cost, tag: 'gave-cost', why: L('That is what she spent. Change is what is left of the money she handed over.', 'Eso es lo que gastó. El cambio es lo que sobra del dinero que entregó.') },
           { value: p.bill - p.price * p.n, tag: 'ignored-fee', why: L('You forgot the delivery fee.', 'Olvidaste el cargo de envío.') },
           { value: p.bill - p.price - p.fee, tag: 'one-item', why: t('You subtracted the price of one flashlight, not {n}.', 'Restaste el precio de una linterna, no de {n}.', v) },
-          { value: p.bill - cost + 10, tag: 'borrow-error', why: L('Re-check the subtraction; a regrouping (borrowing) slip changes the tens digit.', 'Revisa la resta; un error al reagrupar (pedir prestado) cambia las decenas.') },
+          { value: p.bill - p.price - p.n - p.fee, tag: 'added-not-multiplied', why: t('"{n} at {pm} each" means {n} {x} {pm}. You added the two numbers instead of multiplying.', '"{n} a {pm} cada una" significa {n} {x} {pm}. Sumaste los dos números en lugar de multiplicar.', v) },
+          p.weight ? { value: p.bill - cost - p.weight, tag: 'used-extra-info', why: L('The weight has nothing to do with money. Leave it out of the calculation.', 'El peso no tiene nada que ver con el dinero. Déjalo fuera del cálculo.') } : null,
+          borrows(p.bill, cost) ? { value: a + 10, tag: 'borrow-error', why: BORROW } : null,
         ],
         hints: [
           L('Change = money handed over minus the total cost. Find the total cost first and ignore facts that are not about money.', 'Cambio = dinero entregado menos el costo total. Halla primero el costo total e ignora los datos que no son de dinero.'),

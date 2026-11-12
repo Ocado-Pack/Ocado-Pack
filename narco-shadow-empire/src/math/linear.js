@@ -9,9 +9,11 @@ const isZero = (f) => f.n === 0;
 const side = (s) => ({ x: toFrac(s.x || 0), c: toFrac(s.c || 0) });
 const abs = (f) => frac(Math.abs(f.n), f.d);
 
+// coefficient in front of x or of a parenthesis: "" for 1, "3", "(3/2)" for a fraction (the sign is written separately)
+const coef = (f) => (f.d === 1 ? (Math.abs(f.n) === 1 ? '' : String(Math.abs(f.n))) : '(' + Math.abs(f.n) + '/' + f.d + ')');
 function termText(x, c) {
   const parts = [];
-  if (!isZero(x)) parts.push((x.n < 0 ? MINUS : '') + (abs(x).n === 1 && abs(x).d === 1 ? '' : fmtMixed(abs(x)).replace(' ', ' ')) + 'x');
+  if (!isZero(x)) parts.push((x.n < 0 ? MINUS : '') + coef(x) + 'x');
   if (!isZero(c)) parts.push(parts.length ? (c.n < 0 ? MINUS + ' ' : '+ ') + fmtMixed(abs(c)) : fmtMixed(c));
   return parts.length ? parts.join(' ') : '0';
 }
@@ -23,9 +25,9 @@ export function createLinear(spec) {
   });
   let st = init();
   const history = [];
-  const text = (s = st) => (s.paren ? fmtMixed(s.paren.mult) + '(' + termText(s.paren.inner.x, s.paren.inner.c) + ')' : termText(s.L.x, s.L.c)) + ' = ' + termText(s.R.x, s.R.c);
+  const text = (s = st) => (s.paren ? (s.paren.mult.n < 0 ? MINUS : '') + coef(s.paren.mult) + '(' + termText(s.paren.inner.x, s.paren.inner.c) + ')' : termText(s.L.x, s.L.c)) + ' = ' + termText(s.R.x, s.R.c);
   const snapshot = () => JSON.parse(JSON.stringify(st));
-  const fail = (en, es) => ({ ok: false, error: L(en, es), text: text() });
+  const fail = (en, es) => ({ ok: false, error: L(en, es), text: text(), state: snapshot() });
 
   function parseValue(v) {
     if (v && typeof v === 'object' && 'x' in v) { const k = typeof v.x === 'string' ? parseAnswer(v.x) : toFrac(v.x); return k ? { x: k, c: Z } : null; }
@@ -60,7 +62,7 @@ export function createLinear(spec) {
         } else return fail('Unknown operation.', 'Operación desconocida.');
       }
       history.push({ op, value, text: text(), prev });
-      return { ok: true, text: text(), solved: api.isSolved() };
+      return { ok: true, text: text(), state: snapshot(), solved: api.isSolved() };
     },
     undo() { const h = history.pop(); if (h) st = { L: side(h.prev.L), R: side(h.prev.R), paren: h.prev.paren ? { mult: toFrac(h.prev.paren.mult), inner: side(h.prev.paren.inner) } : null }; return text(); },
     reset() { st = init(); history.length = 0; return text(); },

@@ -4,31 +4,35 @@ import { defineTemplate, ans, steps5, t, N, L, fmtMoney, TIMES, MINUS, DIV } fro
 export default [
   defineTemplate({
     id: 'ar.word.compare', topic: 'ar.word', levels: [1, 2, 3], themes: ['warehouse'],
-    params(rng, level) { return { base: rng.int(6, level === 1 ? 20 : 60), k: level === 1 ? 1 : rng.int(2, 4), more: rng.int(3, 15), sign: level >= 2 && rng.chance(0.4) ? -1 : 1, askTotal: level >= 3 }; },
+    params(rng, level) { const base = rng.int(6, level === 1 ? 20 : 60); return { base, k: level === 1 ? 1 : rng.int(2, 4), more: rng.int(3, Math.min(15, base - 1)), sign: level >= 2 && rng.chance(0.4) ? -1 : 1, askTotal: level >= 3 }; },
     build(p) {
       const b = p.k * p.base + p.sign * p.more, a = p.askTotal ? b + p.base : b;
-      const rel = p.k === 1 ? L('', '') : p.k === 2 ? L('twice ', 'el doble de ') : t('{k} times ', '{k} veces ', p);
-      const v = { ...p, b, a, x: TIMES, m: MINUS, rel, dir: p.sign > 0 ? L('more than', 'más que') : L('fewer than', 'menos que'), op: p.sign > 0 ? '+' : MINUS, kb: p.k * p.base };
+      const full = p.k === 1 ? L('Dock A', 'el muelle A') : p.k === 2 ? L('twice Dock A', 'el doble del muelle A') : t('{k} times Dock A', '{k} veces el muelle A', p);
+      const short = p.k === 1 ? L('A') : p.k === 2 ? L('twice A', 'el doble de A') : t('{k} times A', '{k} veces A', p);
+      const one = p.k === 1, eqA = one ? 'A' : `${p.k} ${TIMES} A`, eqN = one ? String(p.base) : `${p.k} ${TIMES} ${p.base}`;   // no "1 ×" when B is compared with A itself
+      const v = { ...p, b, a, x: TIMES, m: MINUS, full, short, eqA, eqN, dir: p.sign > 0 ? L('more than', 'más que') : L('fewer than', 'menos que'), op: p.sign > 0 ? '+' : MINUS, kb: p.k * p.base };
       return {
-        prompt: t('Dock A logged {base} deliveries this week. Dock B logged {more} {dir} {rel}Dock A. ' + (p.askTotal ? 'How many deliveries did the two docks log together?' : 'How many deliveries did Dock B log?'),
-          'El muelle A registró {base} entregas esta semana. El muelle B registró {more} {dir} {rel}el muelle A. ' + (p.askTotal ? '¿Cuántas entregas registraron los dos muelles en total?' : '¿Cuántas entregas registró el muelle B?'), v),
+        prompt: t('Dock A logged {base} deliveries this week. Dock B logged {more} {dir} {full}. ' + (p.askTotal ? 'How many deliveries did the two docks log together?' : 'How many deliveries did Dock B log?'),
+          'El muelle A registró {base} entregas esta semana. El muelle B registró {more} {dir} {full}. ' + (p.askTotal ? '¿Cuántas entregas registraron los dos muelles en total?' : '¿Cuántas entregas registró el muelle B?'), v),
         answer: ans.int(a, N('delivery', 'deliveries', 'entrega', 'entregas')), estSeconds: 50,
         wrong: [
           { value: p.askTotal ? b : b + p.base, tag: p.askTotal ? 'stopped-early' : 'answered-total', why: p.askTotal ? L('That is Dock B alone. The question asks for both docks together.', 'Eso es solo el muelle B. La pregunta pide los dos muelles juntos.') : L('You added Dock A. The question asks only about Dock B.', 'Sumaste el muelle A. La pregunta solo pide el muelle B.') },
           { value: (p.k * p.base - p.sign * p.more) + (p.askTotal ? p.base : 0), tag: 'wrong-direction', why: t('"{dir}" tells you which way to go: here it means {op} {more}.', '"{dir}" te indica la dirección: aquí significa {op} {more}.', v) },
-          { value: p.k * (p.base + p.sign * p.more) + (p.askTotal ? p.base : 0), tag: 'grouping', why: t('Multiply Dock A by {k} first, THEN adjust by {more}.', 'Primero multiplica el muelle A por {k} y DESPUÉS ajusta con {more}.', v) },
-          { value: p.base + p.more + p.k, tag: 'added-all', why: L('Do not simply add every number you see; translate each phrase into an operation.', 'No sumes sin más todos los números que ves; traduce cada frase a una operación.') },
+          p.k > 1 && { value: p.k * (p.base + p.sign * p.more) + (p.askTotal ? p.base : 0), tag: 'grouping', why: t('Multiply Dock A by {k} first, THEN adjust by {more}.', 'Primero multiplica el muelle A por {k} y DESPUÉS ajusta con {more}.', v) },
+          p.k > 1 && { value: p.base + p.more + p.k, tag: 'added-all', why: L('Do not simply add every number you see; translate each phrase into an operation.', 'No sumes sin más todos los números que ves; traduce cada frase a una operación.') },
+          { value: p.more, tag: 'gave-difference', why: L('That is only the gap between the two docks, not the count the question asks for.', 'Esa es solo la diferencia entre los dos muelles, no la cantidad que pide la pregunta.') },
+          { value: p.base, tag: 'gave-given', why: L('That is Dock A’s count, which was already given. Use the comparison to go further.', 'Esa es la cantidad del muelle A, que ya estaba dada. Usa la comparación para ir más allá.') },
         ],
         hints: [
           L('Translate the sentence piece by piece. "More than" adds, "fewer than" subtracts, "twice / times" multiplies.', 'Traduce la oración parte por parte. "Más que" suma, "menos que" resta, "el doble / veces" multiplica.'),
-          t('B = {k} {x} A {op} {more}' + (p.askTotal ? ';  total = A + B' : ''), 'B = {k} {x} A {op} {more}' + (p.askTotal ? ';  total = A + B' : ''), v),
-          t('Start with {k} {x} {base} = {kb}.', 'Empieza con {k} {x} {base} = {kb}.', v)],
+          t('B = {eqA} {op} {more}' + (p.askTotal ? ';  total = A + B' : ''), 'B = {eqA} {op} {more}' + (p.askTotal ? ';  total = A + B' : ''), v),
+          one ? t('Start from Dock A’s count, {base}, then adjust it by {more}.', 'Parte de la cantidad del muelle A, {base}, y luego ajústala con {more}.', v) : t('Start with {k} {x} {base} = {kb}.', 'Empieza con {k} {x} {base} = {kb}.', v)],
         steps: steps5(
           p.askTotal ? L('Find the combined deliveries of both docks.', 'Halla las entregas combinadas de ambos muelles.') : L('Find Dock B’s deliveries.', 'Halla las entregas del muelle B.'),
-          t('A = {base}. B is {more} {dir} {rel}A.', 'A = {base}. B es {more} {dir} {rel}A.', v),
-          t('Write the equation: B = {k} {x} {base} {op} {more}.', 'Escribe la ecuación: B = {k} {x} {base} {op} {more}.', v),
-          t('{k} {x} {base} = {kb}; {kb} {op} {more} = {b}.' + (p.askTotal ? ' Total: {base} + {b} = {a}.' : ''), '{k} {x} {base} = {kb}; {kb} {op} {more} = {b}.' + (p.askTotal ? ' Total: {base} + {b} = {a}.' : ''), v),
-          t('Is B {dir} {rel}A by {more}? {b} vs {kb}: yes.', '¿B es {more} {dir} {rel}A? {b} frente a {kb}: sí.', v)),
+          t('A = {base}. B is {more} {dir} {short}.', 'A = {base}. B es {more} {dir} {short}.', v),
+          t('Write the equation: B = {eqN} {op} {more}.', 'Escribe la ecuación: B = {eqN} {op} {more}.', v),
+          t((one ? '' : '{k} {x} {base} = {kb}; ') + '{kb} {op} {more} = {b}.' + (p.askTotal ? ' Total: {base} + {b} = {a}.' : ''), (one ? '' : '{k} {x} {base} = {kb}; ') + '{kb} {op} {more} = {b}.' + (p.askTotal ? ' Total: {base} + {b} = {a}.' : ''), v),
+          t('Is B {more} {dir} {short}? {b} vs {kb}: yes.', '¿B es {more} {dir} {short}? {b} frente a {kb}: sí.', v)),
         beginner: L('A word problem is a sentence written in a different language. Read it slowly and swap each phrase for a symbol: the thing you are comparing with becomes your starting number, and each comparing phrase becomes one operation on it.', 'Un problema verbal es una oración escrita en otro idioma. Léela despacio y cambia cada frase por un símbolo: aquello con lo que comparas es tu número inicial, y cada frase de comparación es una operación sobre él.'),
         formula: L('"n more than k times A"  →  k × A + n', '"n más que k veces A"  →  k × A + n'),
         visual: { type: 'bars', params: { values: [{ label: L('A'), value: p.base }, { label: L('B'), value: b }], mode: 'total' } },
@@ -47,10 +51,11 @@ export default [
         prompt: t('A courier charges a flat fee of {fm} plus {rm} per mile. A delivery cost {tm}.' + extraEn + ' How many miles was the delivery?', 'Un mensajero cobra una tarifa fija de {fm} más {rm} por milla. Una entrega costó {tm}.' + extraEs + ' ¿De cuántas millas fue la entrega?', v),
         answer: ans.int(p.n, N('mile', 'miles', 'milla', 'millas')), estSeconds: 70,
         wrong: [
-          { value: total / p.rate, tag: 'ignored-fee', why: L('You divided the whole bill by the per-mile rate. Remove the flat fee first.', 'Dividiste toda la cuenta entre la tarifa por milla. Primero quita la tarifa fija.') },
+          { value: Math.round(total / p.rate), tag: 'ignored-fee', why: L('That comes from dividing the whole bill by the per-mile rate. Remove the flat fee first.', 'Eso sale de dividir toda la cuenta entre la tarifa por milla. Primero quita la tarifa fija.') },
           { value: total - p.fee, tag: 'forgot-divide', why: L('That is the money spent on miles. Divide it by the rate to get the miles.', 'Ese es el dinero gastado en millas. Divídelo entre la tarifa para obtener las millas.') },
-          { value: (total + p.fee) / p.rate, tag: 'same-op', why: L('The flat fee is part of the bill, so subtract it; do not add it.', 'La tarifa fija es parte de la cuenta: réstala, no la sumes.') },
-        ].filter((w) => Number.isInteger(w.value)),
+          { value: Math.round((total + p.fee) / p.rate), tag: 'same-op', why: L('The flat fee is part of the bill, so subtract it; do not add it.', 'La tarifa fija es parte de la cuenta: réstala, no la sumes.') },
+          { value: total - p.fee - p.rate, tag: 'wrong-inverse', why: L('"Per mile" multiplies the miles, so undo it by dividing by the rate, not by subtracting it.', '"Por milla" multiplica las millas: se deshace dividiendo entre la tarifa, no restándola.') },
+        ],
         hints: [
           L('The bill has two parts: a part that never changes and a part that grows with the miles. Peel off the fixed part first.', 'La cuenta tiene dos partes: una que nunca cambia y otra que crece con las millas. Quita primero la parte fija.'),
           L('total = fee + rate × miles   →   miles = (total − fee) ÷ rate', 'total = tarifa + precio × millas   →   millas = (total − tarifa) ÷ precio'),

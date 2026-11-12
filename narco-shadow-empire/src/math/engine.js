@@ -3,7 +3,7 @@
 import { createRng, hashString, randomSeed } from '../core/rng.js';
 import { allTemplates, assemble, validateQuestion, checkAnswer } from './kit.js';
 import { TOPICS, LEVELS } from './topics.js';
-import './registry.js';
+import './registry.js';   // side effect: every topic pack registers its templates with the kit
 
 export function createMath(ctx) {
   const templates = allTemplates();
@@ -25,6 +25,7 @@ export function createMath(ctx) {
     const cands = candidates(opts);
     const seed0 = opts.seed === undefined ? randomSeed() : (typeof opts.seed === 'string' ? hashString(opts.seed) : opts.seed >>> 0);
     const pickRng = createRng(seed0);
+    const useRing = opts.seed === undefined;   // an explicit seed asks for a reproducible question: only `avoid` can change it
     let lastErr = null;
     for (let attempt = 0; attempt < 60; attempt++) {
       const exact = cands.filter((t) => t.levels.includes(level));
@@ -40,7 +41,7 @@ export function createMath(ctx) {
       } catch (e) { lastErr = e; continue; }
       const v = validateQuestion(qn, tpl);
       if (!v.ok) { lastErr = new Error(tpl.id + ': ' + v.errors.join('; ')); continue; }
-      if ((has(opts.avoid, qn.signature) || recent.includes(qn.signature)) && attempt < 40) continue;
+      if ((has(opts.avoid, qn.signature) || (useRing && recent.includes(qn.signature))) && attempt < 40) continue;
       remember(qn.signature);
       return qn;
     }

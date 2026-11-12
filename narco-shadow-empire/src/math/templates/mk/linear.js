@@ -1,9 +1,11 @@
 // Topic pack: mk.linear - solving one-variable linear equations (levels 1-5).
-import { defineTemplate, ans, steps5, t, L, fmtInt, MINUS, TIMES, DIV } from '../../kit.js';
+import { defineTemplate, ans, steps5, t, L, frac, fmtMixed, MINUS, TIMES, DIV } from '../../kit.js';
 
 const sgn = (n) => (n < 0 ? MINUS + ' ' + Math.abs(n) : '+ ' + n);         // "+ 5" / "− 5"
 const num = (n) => (n < 0 ? MINUS + Math.abs(n) : String(n));              // "−5"
-const pick = (rng, lo, hi) => { let v = 0; while (v === 0) v = rng.int(lo, hi); return v; };
+const pick = (rng, lo, hi) => { let v = 0; while (v === 0) v = rng.int(lo, hi); return v; };   // never 0
+const xIs = (n, d) => L('x = ' + fmtMixed(frac(n, d)));                    // exact value of n/d, e.g. "x = 7 2/3"
+const UNDO_MUL = (v) => t('{a}x means {a} times x. Undo it by dividing by {a}, not by subtracting.', '{a}x significa {a} por x. Se deshace dividiendo entre {a}, no restando.', v);
 const BAL = L('An equation is a balanced scale: whatever you do to one side you must do to the other. Undo the operations around x one at a time, in reverse order, until x stands alone.',
   'Una ecuación es una balanza equilibrada: lo que hagas a un lado debes hacerlo al otro. Deshaz las operaciones alrededor de x una a la vez, en orden inverso, hasta que x quede sola.');
 
@@ -42,9 +44,12 @@ export default [
 
   defineTemplate({
     id: 'mk.linear.twostep', topic: 'mk.linear', levels: [1, 2, 3],
-    params(rng, level) { return { a: level >= 3 ? pick(rng, -9, 9) || 2 : rng.int(2, 9), b: pick(rng, level === 1 ? 1 : -20, 20), x: level >= 3 ? pick(rng, -9, 12) : rng.int(1, 12) }; },
+    params(rng, level) {
+      const a = level >= 3 ? pick(rng, -9, 9) : rng.int(2, 9);
+      return { a: Math.abs(a) === 1 ? 2 * a : a, b: pick(rng, level === 1 ? 1 : -20, 20), x: level >= 3 ? pick(rng, -9, 12) : rng.int(1, 12) };
+    },
     build(p) {
-      if (Math.abs(p.a) === 1) p = { ...p, a: 2 };
+      if (Math.abs(p.a) < 2 || !p.b) throw new Error('mk.linear.twostep needs |a| >= 2 and b != 0');
       const c = p.a * p.x + p.b, expr = `${num(p.a)}x ${sgn(p.b)} = ${num(c)}`, mid = c - p.b;
       const v = { expr, a: num(p.a), b: Math.abs(p.b), c: num(c), mid: num(mid), x: num(p.x), op: p.b > 0 ? MINUS : '+', inv: p.b > 0 ? L('Subtract', 'Resta') : L('Add', 'Suma'), d: DIV, t: TIMES };
       return {
@@ -53,8 +58,9 @@ export default [
           { value: (c + p.b) / p.a, tag: 'same-op', why: t('You moved {b} the wrong way. Undo "{s}" with the opposite operation.', 'Moviste {b} en la dirección equivocada. Deshaz "{s}" con la operación contraria.', { ...v, s: sgn(p.b) }) },
           { value: mid, tag: 'forgot-divide', why: t('You stopped at {a}x = {mid}. Divide both sides by {a}.', 'Te detuviste en {a}x = {mid}. Divide ambos lados entre {a}.', v) },
           { value: c / p.a - p.b, tag: 'divided-first', why: t('If you divide first, EVERY term must be divided by {a}, including the {b}. It is easier to undo the {s} first.', 'Si divides primero, TODOS los términos se dividen entre {a}, incluido el {b}. Es más fácil deshacer primero el {s}.', { ...v, s: sgn(p.b) }) },
+          { value: mid - p.a, tag: 'subtracted', why: UNDO_MUL(v) },
           { value: -p.x, tag: 'sign', why: L('Check the signs when you divide.', 'Revisa los signos al dividir.') },
-        ].filter((w) => Number.isInteger(w.value) || Math.abs(w.value * 2 % 1) < 1e-9),
+        ],
         hints: [BAL,
           L('Two steps, in reverse order of operations: first undo the addition/subtraction, then undo the multiplication.', 'Dos pasos, en orden inverso de operaciones: primero deshaz la suma/resta y luego la multiplicación.'),
           t('{inv} {b} on both sides: {a}x = {c} {op} {b}.', '{inv} {b} en ambos lados: {a}x = {c} {op} {b}.', v)],
@@ -66,16 +72,20 @@ export default [
         beginner: BAL, formula: L('ax + b = c  →  x = (c − b) ÷ a', 'ax + b = c  →  x = (c − b) ÷ a'),
         trick: L('Undo in reverse: SADMEP (the order of operations backwards).', 'Deshaz al revés: el orden de operaciones, pero hacia atrás.'),
         visual: { type: 'balance', params: { display: expr, lhs: { x: p.a, c: p.b }, rhs: { x: 0, c }, solution: p.x } },
-        rookie: { lines: [L(expr), t('{a}x = {c} + {b}', '{a}x = {c} + {b}', v), t('{a}x = {w}', '{a}x = {w}', { ...v, w: num(c + Math.abs(p.b)) }), t('x = {w}', 'x = {w}', { w: L('…') })].slice(0, p.b > 0 ? 4 : 0), wrongIndex: 1, why: t('To undo + {b} you subtract {b} from both sides: {a}x = {mid}.', 'Para deshacer + {b} se resta {b} en ambos lados: {a}x = {mid}.', v) },
+        rookie: {   // repeats the operation instead of undoing it
+          lines: [L(expr), t('{a}x = {c} {same} {b}', '{a}x = {c} {same} {b}', { ...v, same: p.b > 0 ? '+' : MINUS }), t('{a}x = {w}', '{a}x = {w}', { ...v, w: num(c + p.b) }), xIs(c + p.b, p.a)], wrongIndex: 1,
+          why: t('To undo "{s}" you must {invl} {b} on both sides: {a}x = {mid}.', 'Para deshacer "{s}" hay que {invl} {b} en ambos lados: {a}x = {mid}.', { ...v, s: sgn(p.b), invl: p.b > 0 ? L('subtract', 'restar') : L('add', 'sumar') }),
+        },
       };
     },
-    check(p) { const a = Math.abs(p.a) === 1 ? 2 : p.a; for (let x = -80; x <= 80; x++) if (a * x + p.b === a * p.x + p.b) return x; },
+    check(p) { for (let x = -80; x <= 80; x++) if (p.a * x + p.b === p.a * p.x + p.b) return x; },
   }),
 
   defineTemplate({
     id: 'mk.linear.distribute', topic: 'mk.linear', levels: [2, 3, 4],
     params(rng, level) { const a = level >= 4 ? pick(rng, -6, 7) : rng.int(2, 7), b = pick(rng, -9, 9), x = level >= 3 ? pick(rng, -8, 12) : rng.int(Math.max(1, 1 - b), 14); return { a: Math.abs(a) === 1 ? 3 : a, b, c: (Math.abs(a) === 1 ? 3 : a) * (x + b) }; },
     build(p) {
+      if (Math.abs(p.a) < 2 || !p.b || !Number.isInteger(p.c / p.a)) throw new Error('mk.linear.distribute needs |a| >= 2, b != 0 and c divisible by a');
       const x = p.c / p.a - p.b, expr = `${num(p.a)}(x ${sgn(p.b)}) = ${num(p.c)}`, inner = p.c / p.a, ab = p.a * p.b;
       const v = { expr, a: num(p.a), b: Math.abs(p.b), c: num(p.c), inner: num(inner), x: num(x), ab: num(ab), op: p.b > 0 ? MINUS : '+', inv: p.b > 0 ? L('subtract', 'resta') : L('add', 'suma'), s: sgn(p.b), sab: sgn(ab), d: DIV, t: TIMES };
       return {
@@ -86,10 +96,10 @@ export default [
           { value: p.c - ab, tag: 'forgot-divide', why: t('That is {a}x. You still have to divide by {a}.', 'Eso es {a}x. Todavía debes dividir entre {a}.', v) },
           { value: inner, tag: 'stopped-early', why: t('{inner} is the value of the parentheses (x {s}), not of x.', '{inner} es el valor del paréntesis (x {s}), no de x.', v) },
           { value: -x, tag: 'sign', why: L('Check your signs.', 'Revisa los signos.') },
-        ].filter((w) => Number.isInteger(w.value) || Math.abs((w.value * 4) % 1) < 1e-9),
+        ],
         hints: [
           L('The number in front of the parentheses multiplies the whole group inside. You can either divide both sides by it first, or distribute it.', 'El número delante del paréntesis multiplica a todo el grupo de adentro. Puedes dividir primero ambos lados entre él, o distribuirlo.'),
-          t('Route 1: divide both sides by {a}, then {inv} {b}.  Route 2: distribute to get {a}x {sab} = {c}, then solve the two-step equation.', 'Ruta 1: divide ambos lados entre {a} y luego {inv} {b}.  Ruta 2: distribuye para obtener {a}x {sab} = {c} y resuelve la ecuación de dos pasos.', v),
+          t('Either divide both sides by {a} and then {inv} {b}, or distribute first (multiply BOTH terms inside the parentheses by {a}) and then solve the equation that is left.', 'Puedes dividir ambos lados entre {a} y luego {invEs} {b}, o distribuir primero (multiplica AMBOS términos del paréntesis por {a}) y luego resolver la ecuación que queda.', { ...v, invEs: p.b > 0 ? 'restar' : 'sumar' }),
           t('Divide both sides by {a}:  x {s} = {c} {d} {a}.', 'Divide ambos lados entre {a}:  x {s} = {c} {d} {a}.', v)],
         steps: steps5(
           L('Find the value of x.', 'Halla el valor de x.'),
@@ -101,7 +111,7 @@ export default [
         formula: L('a(x + b) = c  →  x + b = c ÷ a  →  x = c ÷ a − b', 'a(x + b) = c  →  x + b = c ÷ a  →  x = c ÷ a − b'),
         trick: L('Distributive property: a(x + b) = ax + ab.', 'Propiedad distributiva: a(x + b) = ax + ab.'),
         visual: { type: 'balance', params: { display: expr, lhs: { x: p.a, c: ab, mult: p.a, inner: { x: 1, c: p.b } }, rhs: { x: 0, c: p.c }, solution: x } },
-        rookie: { lines: [L(expr), t('{a}x {s} = {c}', '{a}x {s} = {c}', v), t('{a}x = {c} {op} {b}', '{a}x = {c} {op} {b}', v), L('x = …')], wrongIndex: 1, why: t('The {a} must multiply both terms inside: {a}x {sab} = {c}.', 'El {a} debe multiplicar ambos términos de adentro: {a}x {sab} = {c}.', v) },
+        rookie: { lines: [L(expr), t('{a}x {s} = {c}', '{a}x {s} = {c}', v), t('{a}x = {c} {op} {b}', '{a}x = {c} {op} {b}', v), t('{a}x = {w}', '{a}x = {w}', { ...v, w: num(p.c - p.b) }), xIs(p.c - p.b, p.a)], wrongIndex: 1, why: t('The {a} must multiply both terms inside: {a}x {sab} = {c}.', 'El {a} debe multiplicar ambos términos de adentro: {a}x {sab} = {c}.', v) },
       };
     },
     check(p) { for (let x = -200; x <= 200; x++) if (p.a * (x + p.b) === p.c) return x; },
@@ -110,24 +120,29 @@ export default [
   defineTemplate({
     id: 'mk.linear.bothsides', topic: 'mk.linear', levels: [3, 4, 5],
     params(rng, level) {
-      const c = rng.int(1, 6), a = c + rng.int(1, level >= 5 ? 7 : 4), x = level >= 4 ? pick(rng, -9, 12) : rng.int(1, 12), b = pick(rng, -15, 15);
+      const c = rng.int(1, 6), a = c + rng.int(2, level >= 5 ? 7 : 4), x = level >= 4 ? pick(rng, -9, 12) : rng.int(1, 12);
+      let b = pick(rng, -15, 15);
+      if ((a - c) * x + b === 0) b += Math.sign(b);        // keep a constant on the right-hand side (never "= x + 0")
       return { a, b, c, d: (a - c) * x + b };
     },
     build(p) {
-      const x = (p.d - p.b) / (p.a - p.c), expr = `${p.a}x ${sgn(p.b)} = ${p.c}x ${sgn(p.d)}`, k = p.a - p.c, rhs = p.d - p.b;
-      const v = { expr, a: p.a, c: p.c, k, rhs: num(rhs), x: num(x), b: Math.abs(p.b), d: num(p.d), sb: sgn(p.b), opb: p.b > 0 ? MINUS : '+', dv: DIV, t: TIMES };
+      if (p.a === p.c || !p.b || !p.d) throw new Error('mk.linear.bothsides needs a != c, b != 0 and d != 0');
+      const cx = (p.c === 1 ? '' : p.c) + 'x';   // a coefficient of 1 is written "x", never "1x"
+      const x = (p.d - p.b) / (p.a - p.c), expr = `${p.a}x ${sgn(p.b)} = ${cx} ${sgn(p.d)}`, k = p.a - p.c, rhs = p.d - p.b;
+      const v = { expr, a: p.a, c: p.c, cx, k, rhs: num(rhs), x: num(x), b: Math.abs(p.b), d: num(p.d), sb: sgn(p.b), opb: p.b > 0 ? MINUS : '+', dv: DIV, t: TIMES };
       return {
         prompt: t('Solve {expr}.', 'Resuelve {expr}.', v), expr, answer: ans.x(x), accept: [String(x)], estSeconds: 75,
         wrong: [
-          { value: (p.d - p.b) / (p.a + p.c), tag: 'added-x', why: t('To collect the x-terms, subtract {c}x from both sides ({a}x − {c}x = {k}x); you added them.', 'Para juntar los términos con x, resta {c}x en ambos lados ({a}x − {c}x = {k}x); tú los sumaste.', v) },
+          { value: (p.d - p.b) / (p.a + p.c), tag: 'added-x', why: t('To collect the x-terms, subtract {cx} from both sides ({a}x − {cx} = {k}x); you added them.', 'Para juntar los términos con x, resta {cx} en ambos lados ({a}x − {cx} = {k}x); tú los sumaste.', v) },
           { value: (p.d + p.b) / k, tag: 'same-op', why: t('The constant {sb} was moved the wrong way; undo it with the opposite operation.', 'La constante {sb} se movió en la dirección equivocada; deshazla con la operación contraria.', v) },
           { value: rhs, tag: 'forgot-divide', why: t('You reached {k}x = {rhs} but did not divide by {k}.', 'Llegaste a {k}x = {rhs} pero no dividiste entre {k}.', v) },
+          { value: rhs - k, tag: 'subtracted', why: UNDO_MUL({ a: k }) },
           { value: -x, tag: 'sign', why: L('Check your signs.', 'Revisa los signos.') },
-        ].filter((w) => Number.isInteger(w.value) || Math.abs((w.value * 4) % 1) < 1e-9),
+        ],
         hints: [
           L('Get every x on one side and every plain number on the other. Moving a term means doing the opposite operation to both sides.', 'Lleva todas las x a un lado y todos los números al otro. Mover un término significa hacer la operación contraria en ambos lados.'),
-          t('Subtract {c}x from both sides, then undo the constant, then divide by the coefficient of x.', 'Resta {c}x en ambos lados, luego deshaz la constante y por último divide entre el coeficiente de x.', v),
-          t('Subtract {c}x from both sides: {k}x {sb} = {d}.', 'Resta {c}x en ambos lados: {k}x {sb} = {d}.', v)],
+          t('Subtract {cx} from both sides, then undo the constant, then divide by the coefficient of x.', 'Resta {cx} en ambos lados, luego deshaz la constante y por último divide entre el coeficiente de x.', v),
+          t('Subtract {cx} from both sides: {k}x {sb} = {d}.', 'Resta {cx} en ambos lados: {k}x {sb} = {d}.', v)],
         steps: steps5(
           L('Find x when it appears on both sides.', 'Halla x cuando aparece en ambos lados.'), t('{expr}', '{expr}', v),
           L('Collect x-terms on one side, constants on the other, then divide.', 'Junta los términos con x en un lado, las constantes en el otro, y divide.'),
@@ -140,4 +155,3 @@ export default [
     check(p) { for (let x = -300; x <= 300; x++) if (p.a * x + p.b === p.c * x + p.d) return x; },
   }),
 ];
-export { fmtInt };
