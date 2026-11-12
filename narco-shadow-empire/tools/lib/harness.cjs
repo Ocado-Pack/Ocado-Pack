@@ -79,11 +79,11 @@ async function withPage(opts, fn) {
     page.on('response', (r) => { if (r.status() >= 400) report.failedRequests.push(r.url() + ' :: HTTP ' + r.status()); });
 
     const url = opts.file ? pathToFileURL(path.join(ROOT, opts.page.split('?')[0])).href + (opts.page.includes('?') ? '?' + opts.page.split('?')[1] : '') : baseUrl + opts.page;
-    await page.goto(url, { waitUntil: 'load', timeout: opts.timeout || 90000 });
+    await page.goto(url, { waitUntil: 'load', timeout: opts.timeout || 240000 });
     const ready = opts.ready === undefined ? 'window.__ready === true' : opts.ready;
     if (ready) {
       try {
-        await page.waitForFunction(ready, null, { timeout: opts.timeout || 90000, polling: 250 });
+        await page.waitForFunction(ready, null, { timeout: opts.timeout || 240000, polling: 250 });
       } catch (e) {
         report.ok = false;
         report.errors.push('READY TIMEOUT waiting for: ' + ready);

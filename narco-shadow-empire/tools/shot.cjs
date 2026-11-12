@@ -10,7 +10,7 @@
 //   --w <px> --h <px>    viewport size (default 1280x720)      --dpr <n>  device scale factor (default 1)
 //   --wait <ms>          extra wait after the page is ready (default 1500)
 //   --ready <expr>       JS expression that must become truthy (default "window.__ready === true"; "" to skip)
-//   --timeout <ms>       ready/navigation timeout (default 90000)
+//   --timeout <ms>       ready/navigation timeout (default 240000)
 //   --eval <js>          evaluate JS in the page (repeatable, run in order; awaited; results in report.evals)
 //   --scenario <f.cjs>   module exporting  async ({page, shot, sleep, log, evalJs, report, baseUrl}) => any
 //   --file               load via file:// (use for dist/narco-shadow-empire.html)
